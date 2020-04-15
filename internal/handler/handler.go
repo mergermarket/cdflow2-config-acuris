@@ -7,6 +7,7 @@ import (
 
 // Handler handles config requests.
 type Handler struct {
+	STSClient stsiface.STSAPI
 }
 
 // Opts are the options for creating a new handler.
@@ -16,8 +17,9 @@ type Opts struct {
 
 // New returns a new handler.
 func New(opts *Opts) *Handler {
-
-	return &Handler{}
+	return &Handler{
+		STSClient: opts.STSClient,
+	}
 }
 
 // Setup sets up the project.

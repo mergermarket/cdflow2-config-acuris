@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"log"
 
 	"github.com/mergermarket/cdflow2-config-acuris/internal/handler"
@@ -9,7 +11,9 @@ import (
 )
 
 func main() {
-	handler := handler.New(&handler.Opts{})
+	handler := handler.New(&handler.Opts{
+		STSClient: sts.New(session.New()),
+	})
 	request := common.CreateConfigureReleaseRequest()
 	request.Team = "ninenine"
 	request.ReleaseRequiredEnv = map[string][]string{
