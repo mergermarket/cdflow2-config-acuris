@@ -1,7 +1,6 @@
 package handler_test
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
@@ -20,7 +19,7 @@ func TestConfigureRelease(t *testing.T) {
 	response := common.CreateConfigureReleaseResponse()
 
 	handler := handler.New(&handler.Opts{
-		STSClient:	mockedSTS{}
+		STSClient: mockedSTS{},
 	})
 
 	// When
