@@ -1,6 +1,9 @@
 package handler
 
-import common "github.com/mergermarket/cdflow2-config-common"
+import (
+	"github.com/aws/aws-sdk-go/service/sts/stsiface"
+	common "github.com/mergermarket/cdflow2-config-common"
+)
 
 // Handler handles config requests.
 type Handler struct {
@@ -8,6 +11,7 @@ type Handler struct {
 
 // Opts are the options for creating a new handler.
 type Opts struct {
+	STSClient stsiface.STSAPI
 }
 
 // New returns a new handler.
@@ -18,11 +22,6 @@ func New(opts *Opts) *Handler {
 
 // Setup sets up the project.
 func (handler *Handler) Setup(request *common.SetupRequest, response *common.SetupResponse) error {
-	return nil
-}
-
-// ConfigureRelease runs before release to configure it.
-func (handler *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse) error {
 	return nil
 }
 
