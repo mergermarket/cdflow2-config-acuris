@@ -5,6 +5,7 @@ github.com/logrusorgru/aurora v0.0.0-20200102142835-e9ef32dff381/go.mod h1:7rIyQ
 github.com/mergermarket/cdflow2-config-common v0.24.0 h1:1pkcmgiVc7GTlEFNUEnc8j99l+kNcaHpoGPCFrsP0wA=
 github.com/mergermarket/cdflow2-config-common v0.24.0/go.mod h1:kNBuyxspdu5cWP5e7VAmrP+5elB2wP5pHlcvLLpiyzI=
 github.com/mergermarket/cdflow2-config-common v0.25.0 h1:4y6I52ScYtVCTB42ZHSamN13oqb/dQQS1PoZmLDhEvg=
+github.com/mergermarket/cdflow2-config-simple-aws v0.0.0-20200316171605-3b5d8a4446df h1:+PQpAAWpFZM3kDjUpi7TMPYbRvpudiIRNCZYDiF8j/g=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5cxcmMvtA=

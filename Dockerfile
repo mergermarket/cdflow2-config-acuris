@@ -1,6 +1,6 @@
 FROM golang:alpine AS build
 WORKDIR /
-RUN apk add -U ca-certificates
+RUN apk add -U ca-certificates git
 ADD go.mod go.sum ./
 RUN go mod download
 ADD . .
