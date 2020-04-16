@@ -14,19 +14,28 @@ import (
 	common "github.com/mergermarket/cdflow2-config-common"
 )
 
-type mockedSTS struct {
+type mockedSTSClient struct {
 	stsiface.STSAPI
 	creds map[string]string
 }
 
-func (s *mockedSTS) AssumeRole(*sts.AssumeRoleInput) (*sts.AssumeRoleOutput, error) {
+func (c *mockedSTSClient) AssumeRole(*sts.AssumeRoleInput) (*sts.AssumeRoleOutput, error) {
 	return &sts.AssumeRoleOutput{
 		Credentials: &sts.Credentials{
-			AccessKeyId:     aws.String(s.creds["accessKeyId"]),
-			SecretAccessKey: aws.String(s.creds["secretAccessKey"]),
-			SessionToken:    aws.String(s.creds["sessionToken"]),
+			AccessKeyId:     aws.String(c.creds["accessKeyId"]),
+			SecretAccessKey: aws.String(c.creds["secretAccessKey"]),
+			SessionToken:    aws.String(c.creds["sessionToken"]),
 		},
 	}, nil
+}
+
+type failingSTSClient struct {
+	stsiface.STSAPI
+	errorText string
+}
+
+func (c *failingSTSClient) AssumeRole(*sts.AssumeRoleInput) (*sts.AssumeRoleOutput, error) {
+	return &sts.AssumeRoleOutput{}, fmt.Errorf(c.errorText)
 }
 
 func TestConfigureRelease(t *testing.T) {
@@ -46,7 +55,7 @@ func TestConfigureRelease(t *testing.T) {
 		assumeRoleCreds["sessionToken"] = "SessionToken"
 		handler := handler.New(&handler.Opts{
 			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
-				return &mockedSTS{
+				return &mockedSTSClient{
 					creds: assumeRoleCreds,
 				}, nil
 			},
@@ -83,11 +92,6 @@ func TestConfigureRelease(t *testing.T) {
 		var errorBuffer bytes.Buffer
 
 		request := common.CreateConfigureReleaseRequest()
-		request.Team = "my-team"
-		request.ReleaseRequiredEnv = map[string][]string{
-			"build1": {},
-			"build2": {},
-		}
 		response := common.CreateConfigureReleaseResponse()
 
 		errorText := "test-error-text"
@@ -107,6 +111,34 @@ func TestConfigureRelease(t *testing.T) {
 		}
 		if errorBuffer.String() != errorText+"\n" {
 			t.Fatalf("expected %q, got %q", errorText+"\n", errorBuffer.String())
+		}
+	})
+
+	t.Run("aws credentials failing client to assume role", func(t *testing.T) {
+		// Given
+		var errorBuffer bytes.Buffer
+
+		request := common.CreateConfigureReleaseRequest()
+		response := common.CreateConfigureReleaseResponse()
+
+		errorText := "test-error-text"
+		handler := handler.New(&handler.Opts{
+			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
+				return &failingSTSClient{errorText: errorText}, nil
+			},
+			ErrorStream: &errorBuffer,
+		})
+
+		// When
+		handler.ConfigureRelease(request, response)
+
+		// Then
+		if response.Success {
+			t.Fatal("unexpected success")
+		}
+		fullMessage := "Unable to assume role: " + errorText + "\n"
+		if errorBuffer.String() != fullMessage {
+			t.Fatalf("expected %q, got %q", fullMessage, errorBuffer.String())
 		}
 	})
 }

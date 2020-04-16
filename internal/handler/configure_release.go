@@ -2,8 +2,6 @@ package handler
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sts"
 	common "github.com/mergermarket/cdflow2-config-common"
@@ -22,8 +20,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 		RoleSessionName: aws.String("role-session-name"),
 	})
 	if err != nil {
-		// @todo change this to use output from the handler
-		fmt.Fprintln(os.Stderr, "Unable to assume role:", err)
+		fmt.Fprintln(h.ErrorStream, "Unable to assume role:", err)
 		response.Success = false
 		return nil
 	}
