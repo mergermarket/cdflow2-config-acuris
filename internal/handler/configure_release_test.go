@@ -16,7 +16,8 @@ import (
 
 type mockedSTSClient struct {
 	stsiface.STSAPI
-	creds map[string]string
+	creds           map[string]string
+	irrelevantCreds map[string]string
 }
 
 func (c *mockedSTSClient) AssumeRole(*sts.AssumeRoleInput) (*sts.AssumeRoleOutput, error) {
@@ -42,7 +43,6 @@ func TestConfigureRelease(t *testing.T) {
 	t.Run("aws creds happy path", func(t *testing.T) {
 		// Given
 		request := common.CreateConfigureReleaseRequest()
-		request.Team = "my-team"
 		request.ReleaseRequirements = map[string]map[string]interface{}{
 			"build1": {},
 			"build2": {},
@@ -84,6 +84,45 @@ func TestConfigureRelease(t *testing.T) {
 			if !reflect.DeepEqual(response.Env[id], expectedEnvVars) {
 				t.Fatalf("Expected %+v, got %+v", expectedEnvVars, response.Env[id])
 			}
+		}
+	})
+
+	t.Run("Lambda build", func(t *testing.T) {
+		// Given
+		request := common.CreateConfigureReleaseRequest()
+		request.ReleaseRequirements = map[string]map[string]interface{}{
+			"my-lambda": {
+				"needs": []string{"lambda"},
+			},
+			"my-x": {},
+		}
+		response := common.CreateConfigureReleaseResponse()
+
+		h := handler.New(&handler.Opts{
+			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
+				return &mockedSTSClient{
+					creds: getIrrelevantCreds(),
+				}, nil
+			},
+		})
+
+		// When
+		h.ConfigureRelease(request, response)
+
+		// Then
+		if !response.Success {
+			t.Fatal("unexpected failure")
+		}
+		if len(response.Env) != 2 {
+			t.Fatalf("Expected 2 builds, got %d", len(response.Env))
+		}
+		bucketName := response.Env["my-lambda"]["LAMBDA_BUCKET"]
+		if bucketName != handler.DefaultLambdaBucket {
+			t.Fatalf("got %q, want %q", bucketName, handler.DefaultLambdaBucket)
+		}
+		bucketName = response.Env["my-x"]["LAMBDA_BUCKET"]
+		if bucketName != "" {
+			t.Fatalf("my-x should not have LAMBDA_BUCKET, but got %q", bucketName)
 		}
 	})
 
@@ -141,4 +180,12 @@ func TestConfigureRelease(t *testing.T) {
 			t.Fatalf("expected %q, got %q", fullMessage, errorBuffer.String())
 		}
 	})
+}
+
+func getIrrelevantCreds() map[string]string {
+	return map[string]string{
+		"accessKeyId":     "AccessKeyId",
+		"secretAccessKey": "SecretAccessKey",
+		"sessionToken":    "SessionToken",
+	}
 }
