@@ -43,7 +43,7 @@ func TestConfigureRelease(t *testing.T) {
 		// Given
 		request := common.CreateConfigureReleaseRequest()
 		request.Team = "my-team"
-		request.ReleaseRequiredEnv = map[string][]string{
+		request.ReleaseRequirements = map[string]map[string]interface{}{
 			"build1": {},
 			"build2": {},
 		}

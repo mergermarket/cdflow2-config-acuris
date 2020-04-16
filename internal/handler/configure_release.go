@@ -25,7 +25,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 		return nil
 	}
 
-	for buildID := range request.ReleaseRequiredEnv {
+	for buildID := range request.ReleaseRequirements {
 		response.Env[buildID] = make(map[string]string)
 		response.Env[buildID]["AWS_ACCESS_KEY_ID"] = *result.Credentials.AccessKeyId
 		response.Env[buildID]["AWS_SECRET_ACCESS_KEY"] = *result.Credentials.SecretAccessKey
