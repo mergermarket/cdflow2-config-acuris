@@ -1,7 +1,9 @@
 package handler_test
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sts"
+	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
@@ -11,18 +13,15 @@ import (
 
 type mockedSTS struct {
 	stsiface.STSAPI
-	envVars map[string]string
+	creds map[string]string
 }
 
 func (s *mockedSTS) AssumeRole(*sts.AssumeRoleInput) (*sts.AssumeRoleOutput, error) {
-	id := s.envVars["accessKeyId"]
-	key := s.envVars["secretAccessKey"]
-	token := s.envVars["sessionToken"]
 	return &sts.AssumeRoleOutput{
 		Credentials: &sts.Credentials{
-			AccessKeyId:     &id,
-			SecretAccessKey: &key,
-			SessionToken:    &token,
+			AccessKeyId:     aws.String(s.creds["accessKeyId"]),
+			SecretAccessKey: aws.String(s.creds["secretAccessKey"]),
+			SessionToken:    aws.String(s.creds["sessionToken"]),
 		},
 	}, nil
 }
@@ -32,48 +31,45 @@ func TestConfigureRelease(t *testing.T) {
 	request := common.CreateConfigureReleaseRequest()
 	request.Team = "my-team"
 	request.ReleaseRequiredEnv = map[string][]string{
-		"service1": {},
-		"service2": {},
+		"build1": {},
+		"build2": {},
 	}
 	response := common.CreateConfigureReleaseResponse()
 
-	envVars := make(map[string]string)
-	envVars["accessKeyId"] = "AccessKeyId"
-	envVars["secretAccessKey"] = "SecretAccessKey"
-	envVars["sessionToken"] = "SessionToken"
+	assumeRoleCreds := make(map[string]string)
+	assumeRoleCreds["accessKeyId"] = "AccessKeyId"
+	assumeRoleCreds["secretAccessKey"] = "SecretAccessKey"
+	assumeRoleCreds["sessionToken"] = "SessionToken"
 	handler := handler.New(&handler.Opts{
-		STSClient: &mockedSTS{
-			envVars: envVars,
+		STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
+			return &mockedSTS{
+				creds: assumeRoleCreds,
+			}, nil
 		},
 	})
 
 	// When
-	err := handler.ConfigureRelease(request, response)
+	handler.ConfigureRelease(request, response)
 
 	// Then
-	if err != nil {
-		t.Fatalf("Did not expect an error, but got one: %v", err)
-	}
-	// @todo is response.Success actually being used elsewhere? Shouldn't err returned from the method be enough?
 	if !response.Success {
 		t.Fatal("unexpected failure")
 	}
 	if len(response.Env) != 2 {
-		t.Fatalf("Expected 2 services, got %d", len(response.Env))
+		t.Fatalf("Expected 2 builds, got %d", len(response.Env))
+	}
+	expectedEnvVars := map[string]string{
+		"AWS_ACCESS_KEY_ID":     assumeRoleCreds["accessKeyId"],
+		"AWS_DEFAULT_REGION":    "eu-west-1",
+		"AWS_SECRET_ACCESS_KEY": assumeRoleCreds["secretAccessKey"],
+		"AWS_SESSION_TOKEN":     assumeRoleCreds["sessionToken"],
 	}
 	for id := range response.Env {
-		if id != "service1" && id != "service2" {
-			t.Fatalf("Unexpected service %q", id)
+		if id != "build1" && id != "build2" {
+			t.Fatalf("Unexpected build env %q", id)
 		}
-		for _, envVarName := range []string{
-			"AWS_ACCESS_KEY_ID",
-			"AWS_SECRET_ACCESS_KEY",
-			"AWS_SESSION_TOKEN",
-			"AWS_DEFAULT_REGION",
-		} {
-			if response.Env[id][envVarName] == "" {
-				t.Fatalf("%q is empty", envVarName)
-			}
+		if !reflect.DeepEqual(response.Env[id], expectedEnvVars) {
+			t.Fatalf("Expected %+v, got %+v", expectedEnvVars, response.Env[id])
 		}
 	}
 }

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sts"
@@ -10,12 +11,22 @@ import (
 
 // ConfigureRelease runs before release to configure it.
 func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse) error {
-	result, err := h.STSClient.AssumeRole(&sts.AssumeRoleInput{
+	STSClient, err := h.STSClientFactory(request.Env)
+	if err != nil {
+		// @todo change this to use output from the handler
+		fmt.Fprintln(os.Stderr, err)
+		response.Success = false
+		return nil
+	}
+	result, err := STSClient.AssumeRole(&sts.AssumeRoleInput{
 		RoleArn:         aws.String(fmt.Sprintf("arn:aws:iam::724178030834:role/%s-deploy", request.Team)),
 		RoleSessionName: aws.String("role-session-name"),
 	})
 	if err != nil {
-		return err
+		// @todo change this to use output from the handler
+		fmt.Fprintf(os.Stderr, "Unable to assume role: %v", err)
+		response.Success = false
+		return nil
 	}
 
 	for buildID := range request.ReleaseRequiredEnv {
@@ -26,5 +37,6 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 		response.Env[buildID]["AWS_DEFAULT_REGION"] = "eu-west-1"
 	}
 
+	response.Success = true
 	return nil
 }
