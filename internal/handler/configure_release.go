@@ -13,8 +13,7 @@ import (
 func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse) error {
 	STSClient, err := h.STSClientFactory(request.Env)
 	if err != nil {
-		// @todo change this to use output from the handler
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(h.ErrorStream, err)
 		response.Success = false
 		return nil
 	}
@@ -24,7 +23,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 	})
 	if err != nil {
 		// @todo change this to use output from the handler
-		fmt.Fprintf(os.Stderr, "Unable to assume role: %v", err)
+		fmt.Fprintln(os.Stderr, "Unable to assume role:", err)
 		response.Success = false
 		return nil
 	}

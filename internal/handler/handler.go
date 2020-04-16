@@ -2,6 +2,8 @@ package handler
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -13,13 +15,18 @@ import (
 // Handler handles config requests.
 type Handler struct {
 	STSClientFactory STSClientFactory
+	OutputStream     io.Writer
+	ErrorStream      io.Writer
 }
 
 // Opts are the options for creating a new handler.
 type Opts struct {
 	STSClientFactory STSClientFactory
+	OutputStream     io.Writer
+	ErrorStream      io.Writer
 }
 
+// STSClientFactory is a factory method for creating an STS client.
 type STSClientFactory func(env map[string]string) (stsiface.STSAPI, error)
 
 // New returns a new handler.
@@ -30,6 +37,8 @@ func New(opts *Opts) *Handler {
 	}
 	return &Handler{
 		STSClientFactory: factory,
+		OutputStream:     opts.OutputStream,
+		ErrorStream:      opts.ErrorStream,
 	}
 }
 
@@ -38,12 +47,12 @@ func getSTSClientFactory() STSClientFactory {
 		id := env["AWS_ACCESS_KEY_ID"]
 		secret := env["AWS_SECRET_ACCESS_KEY"]
 		if id == "" || secret == "" {
-			return nil, fmt.Errorf("AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY not found in env\n")
+			return nil, fmt.Errorf("AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY not found in env")
 		}
 		creds := credentials.NewStaticCredentials(id, secret, env["AWS_SESSION_TOKEN"])
 		session, err := session.NewSession(aws.NewConfig().WithCredentials(creds).WithRegion("eu-west-1"))
 		if err != nil {
-			return nil, fmt.Errorf("unable to create a new AWS session: %v\n", err)
+			return nil, fmt.Errorf("unable to create a new AWS session: %v", err)
 		}
 		return sts.New(session), nil
 	}
