@@ -2,6 +2,7 @@ package handler
 
 import (
 	"io"
+	"os"
 
 	"github.com/aws/aws-sdk-go/service/sts"
 	common "github.com/mergermarket/cdflow2-config-common"
@@ -19,14 +20,6 @@ type AWSClient interface {
 // Handler handles config requests.
 type Handler struct {
 	AWSClientFactory AWSClientFactory
-	OutputStream     io.Writer
-	ErrorStream      io.Writer
-}
-
-// Opts are the options for creating a new handler.
-type Opts struct {
-	AWSClientFactory AWSClientFactory
-	OutputStream     io.Writer
 	ErrorStream      io.Writer
 }
 
@@ -34,15 +27,18 @@ type Opts struct {
 type AWSClientFactory func(env map[string]string) AWSClient
 
 // New returns a new handler.
-func New(opts *Opts) *Handler {
-	awsClientFactory := opts.AWSClientFactory
-	if awsClientFactory == nil {
-		awsClientFactory = getAWSClientSDKFactory()
-	}
+func New(awsClientFactory AWSClientFactory, errorStream io.Writer) *Handler {
 	return &Handler{
 		AWSClientFactory: awsClientFactory,
-		OutputStream:     opts.OutputStream,
-		ErrorStream:      opts.ErrorStream,
+		ErrorStream:      errorStream,
+	}
+}
+
+// NewWithDefaults returns a handler with default values.
+func NewWithDefaults() *Handler {
+	return &Handler{
+		AWSClientFactory: getAWSClientSDKFactory(),
+		ErrorStream:      os.Stderr,
 	}
 }
 

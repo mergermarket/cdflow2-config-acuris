@@ -10,6 +10,6 @@ func main() {
 	if len(os.Args) == 2 && os.Args[1] == "forward" {
 		common.Forward(os.Stdin, os.Stdout, "")
 	} else {
-		common.Listen(handler.New(&handler.Opts{}), "", nil)
+		common.Listen(handler.NewWithDefaults(), "", nil)
 	}
 }

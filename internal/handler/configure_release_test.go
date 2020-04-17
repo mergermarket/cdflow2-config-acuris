@@ -171,12 +171,12 @@ func TestConfigureRelease(t *testing.T) {
 		}
 		response := common.CreateConfigureReleaseResponse()
 		var errorBuffer bytes.Buffer
-		h := handler.New(&handler.Opts{
-			AWSClientFactory: func(map[string]string) handler.AWSClient {
+		h := handler.New(
+			func(map[string]string) handler.AWSClient {
 				return &mockAWSClientNonexistentRepo{}
 			},
-			ErrorStream: &errorBuffer,
-		})
+			&errorBuffer,
+		)
 
 		// When
 		h.ConfigureRelease(request, response)
@@ -250,12 +250,12 @@ func TestConfigureRelease(t *testing.T) {
 
 		errorText := "test-error-text"
 		var errorBuffer bytes.Buffer
-		h := handler.New(&handler.Opts{
-			AWSClientFactory: func(map[string]string) handler.AWSClient {
+		h := handler.New(
+			func(map[string]string) handler.AWSClient {
 				return &mockAWSClientUnableToObtainRole{errorText: errorText}
 			},
-			ErrorStream: &errorBuffer,
-		})
+			&errorBuffer,
+		)
 
 		// When
 		h.ConfigureRelease(request, response)
@@ -273,12 +273,12 @@ func TestConfigureRelease(t *testing.T) {
 
 func createStandardHandler(assumeRoleCreds map[string]string) (*handler.Handler, *bytes.Buffer) {
 	var errorBuffer bytes.Buffer
-	return handler.New(&handler.Opts{
-		AWSClientFactory: func(map[string]string) handler.AWSClient {
+	return handler.New(
+		func(map[string]string) handler.AWSClient {
 			return &mockAWSClient{creds: assumeRoleCreds}
 		},
-		ErrorStream: &errorBuffer,
-	}), &errorBuffer
+		&errorBuffer,
+	), &errorBuffer
 }
 
 func getIrrelevantCreds() map[string]string {
