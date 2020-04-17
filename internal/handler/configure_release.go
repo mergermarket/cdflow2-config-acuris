@@ -45,6 +45,10 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 		for _, need := range listOfNeeds {
 			if need == "lambda" {
 				response.Env[buildID]["LAMBDA_BUCKET"] = DefaultLambdaBucket
+			} else {
+				fmt.Fprintf(h.ErrorStream, "unable to satisfy %q need for %q build", need, buildID)
+				response.Success = false
+				return nil
 			}
 		}
 	}

@@ -126,6 +126,38 @@ func TestConfigureRelease(t *testing.T) {
 		}
 	})
 
+	t.Run("unsupported need for a build", func(t *testing.T) {
+		// Given
+		request := common.CreateConfigureReleaseRequest()
+		request.ReleaseRequirements = map[string]map[string]interface{}{
+			"something": {
+				"needs": []string{"unsupported"},
+			},
+		}
+		response := common.CreateConfigureReleaseResponse()
+
+		var errorBuffer bytes.Buffer
+		h := handler.New(&handler.Opts{
+			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
+				return &mockedSTSClient{
+					creds: getIrrelevantCreds(),
+				}, nil
+			},
+			ErrorStream: &errorBuffer,
+		})
+
+		// When
+		h.ConfigureRelease(request, response)
+
+		// Then
+		if response.Success {
+			t.Fatal("unexpected success")
+		}
+		if errorBuffer.String() != "unable to satisfy \"unsupported\" need for \"something\" build" {
+			t.Fatalf("wrong error?: %q", errorBuffer.String())
+		}
+	})
+
 	t.Run("aws credentials failing client factory", func(t *testing.T) {
 		// Given
 		var errorBuffer bytes.Buffer
