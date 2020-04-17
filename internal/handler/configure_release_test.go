@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/ecr"
+	"github.com/aws/aws-sdk-go/service/ecr/ecriface"
 	"github.com/aws/aws-sdk-go/service/sts"
 
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
@@ -37,6 +40,28 @@ type failingSTSClient struct {
 
 func (c *failingSTSClient) AssumeRole(*sts.AssumeRoleInput) (*sts.AssumeRoleOutput, error) {
 	return &sts.AssumeRoleOutput{}, fmt.Errorf(c.errorText)
+}
+
+type mockECRClient struct {
+	ecriface.ECRAPI
+	componentName string
+}
+
+func (m mockECRClient) DescribeRepositories(input *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
+	uri := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", handler.AccountID, handler.Region, m.componentName)
+	return &ecr.DescribeRepositoriesOutput{
+		Repositories: []*ecr.Repository{
+			{RepositoryUri: aws.String(uri)},
+		},
+	}, nil
+}
+
+type failingMockECRClient struct {
+	ecriface.ECRAPI
+}
+
+func (m failingMockECRClient) DescribeRepositories(input *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
+	return &ecr.DescribeRepositoriesOutput{}, awserr.New(ecr.ErrCodeRepositoryNotFoundException, "repository not found", nil)
 }
 
 func TestConfigureRelease(t *testing.T) {
@@ -154,7 +179,18 @@ func TestConfigureRelease(t *testing.T) {
 			},
 		}
 		response := common.CreateConfigureReleaseResponse()
-		h, errorBuffer := createStandardHandler(getIrrelevantCreds())
+		var errorBuffer bytes.Buffer
+		h := handler.New(&handler.Opts{
+			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
+				return &mockedSTSClient{
+					creds: getIrrelevantCreds(),
+				}, nil
+			},
+			ECRClientFactory: func(map[string]string) (ecriface.ECRAPI, error) {
+				return &failingMockECRClient{}, nil
+			},
+			ErrorStream: &errorBuffer,
+		})
 
 		// When
 		h.ConfigureRelease(request, response)
@@ -254,7 +290,9 @@ func createStandardHandler(assumeRoleCreds map[string]string) (*handler.Handler,
 			return &mockedSTSClient{
 				creds: assumeRoleCreds,
 			}, nil
-
+		},
+		ECRClientFactory: func(map[string]string) (ecriface.ECRAPI, error) {
+			return &mockECRClient{componentName: "my-component"}, nil
 		},
 		ErrorStream: &errorBuffer,
 	}), &errorBuffer

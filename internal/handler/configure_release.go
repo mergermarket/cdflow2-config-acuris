@@ -2,7 +2,11 @@ package handler
 
 import (
 	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/ecr"
+	"github.com/aws/aws-sdk-go/service/ecr/ecriface"
 	"github.com/aws/aws-sdk-go/service/sts"
 	common "github.com/mergermarket/cdflow2-config-common"
 )
@@ -21,6 +25,13 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 	})
 	if err != nil {
 		fmt.Fprintln(h.ErrorStream, "Unable to assume role:", err)
+		response.Success = false
+		return nil
+	}
+
+	ecrClient, err := h.ECRClientFactory(request.Env)
+	if err != nil {
+		fmt.Fprintln(h.ErrorStream, err)
 		response.Success = false
 		return nil
 	}
@@ -44,7 +55,13 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 			if need == "lambda" {
 				response.Env[buildID]["LAMBDA_BUCKET"] = DefaultLambdaBucket
 			} else if need == "ecr" {
-				response.Env[buildID]["ECR_REPOSITORY"] = getEcrRepo(request.Component)
+				repo, err := h.getEcrRepo(request.Component, ecrClient)
+				if err != nil {
+					response.Success = false
+					fmt.Fprintln(h.ErrorStream, err)
+					return nil
+				}
+				response.Env[buildID]["ECR_REPOSITORY"] = repo
 			} else {
 				fmt.Fprintf(h.ErrorStream, "unable to satisfy %q need for %q build", need, buildID)
 				response.Success = false
@@ -57,6 +74,16 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 	return nil
 }
 
-func getEcrRepo(componentName string) string {
-	return fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", AccountID, Region, componentName)
+func (h *Handler) getEcrRepo(componentName string, ecrClient ecriface.ECRAPI) (string, error) {
+	response, err := ecrClient.DescribeRepositories(&ecr.DescribeRepositoriesInput{
+		RepositoryNames: []*string{aws.String(componentName)},
+	})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == ecr.ErrCodeRepositoryNotFoundException {
+			return "", fmt.Errorf("ECR repository for %s does not exist", componentName)
+		} else {
+			return "", err
+		}
+	}
+	return *response.Repositories[0].RepositoryUri, nil
 }
