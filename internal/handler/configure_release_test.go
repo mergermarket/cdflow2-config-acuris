@@ -7,61 +7,52 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/ecr"
-	"github.com/aws/aws-sdk-go/service/ecr/ecriface"
 	"github.com/aws/aws-sdk-go/service/sts"
 
-	"github.com/aws/aws-sdk-go/service/sts/stsiface"
 	"github.com/mergermarket/cdflow2-config-acuris/internal/handler"
 	common "github.com/mergermarket/cdflow2-config-common"
 )
 
-type mockedSTSClient struct {
-	stsiface.STSAPI
-	creds           map[string]string
-	irrelevantCreds map[string]string
+type mockAWSClient struct {
+	creds map[string]string
 }
 
-func (c *mockedSTSClient) AssumeRole(*sts.AssumeRoleInput) (*sts.AssumeRoleOutput, error) {
-	return &sts.AssumeRoleOutput{
-		Credentials: &sts.Credentials{
-			AccessKeyId:     aws.String(c.creds["accessKeyId"]),
-			SecretAccessKey: aws.String(c.creds["secretAccessKey"]),
-			SessionToken:    aws.String(c.creds["sessionToken"]),
-		},
+func (m *mockAWSClient) STSAssumeRole(string) (*sts.Credentials, error) {
+	return &sts.Credentials{
+		AccessKeyId:     aws.String(m.creds["accessKeyId"]),
+		SecretAccessKey: aws.String(m.creds["secretAccessKey"]),
+		SessionToken:    aws.String(m.creds["sessionToken"]),
 	}, nil
 }
 
-type failingSTSClient struct {
-	stsiface.STSAPI
+func (m *mockAWSClient) GetECRRepoURI(componentName string) (string, error) {
+	return fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", handler.AccountID, handler.Region, componentName), nil
+}
+
+type mockAWSClientNonexistentRepo struct{}
+
+func (m *mockAWSClientNonexistentRepo) STSAssumeRole(string) (*sts.Credentials, error) {
+	return &sts.Credentials{
+		AccessKeyId:     aws.String("accessKeyId"),
+		SecretAccessKey: aws.String("secretAccessKey"),
+		SessionToken:    aws.String("sessionToken"),
+	}, nil
+}
+
+func (m *mockAWSClientNonexistentRepo) GetECRRepoURI(componentName string) (string, error) {
+	return "", fmt.Errorf("no ecr repo for %q", componentName)
+}
+
+type mockAWSClientUnableToObtainRole struct {
 	errorText string
 }
 
-func (c *failingSTSClient) AssumeRole(*sts.AssumeRoleInput) (*sts.AssumeRoleOutput, error) {
-	return &sts.AssumeRoleOutput{}, fmt.Errorf(c.errorText)
+func (m *mockAWSClientUnableToObtainRole) STSAssumeRole(string) (*sts.Credentials, error) {
+	return nil, fmt.Errorf(m.errorText)
 }
 
-type mockECRClient struct {
-	ecriface.ECRAPI
-	componentName string
-}
-
-func (m mockECRClient) DescribeRepositories(input *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
-	uri := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", handler.AccountID, handler.Region, m.componentName)
-	return &ecr.DescribeRepositoriesOutput{
-		Repositories: []*ecr.Repository{
-			{RepositoryUri: aws.String(uri)},
-		},
-	}, nil
-}
-
-type failingMockECRClient struct {
-	ecriface.ECRAPI
-}
-
-func (m failingMockECRClient) DescribeRepositories(input *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
-	return &ecr.DescribeRepositoriesOutput{}, awserr.New(ecr.ErrCodeRepositoryNotFoundException, "repository not found", nil)
+func (m *mockAWSClientUnableToObtainRole) GetECRRepoURI(string) (string, error) {
+	panic("implement me")
 }
 
 func TestConfigureRelease(t *testing.T) {
@@ -92,7 +83,7 @@ func TestConfigureRelease(t *testing.T) {
 		}
 		expectedEnvVars := map[string]string{
 			"AWS_ACCESS_KEY_ID":     assumeRoleCreds["accessKeyId"],
-			"AWS_DEFAULT_REGION":    "eu-west-1",
+			"AWS_DEFAULT_REGION":    handler.Region,
 			"AWS_SECRET_ACCESS_KEY": assumeRoleCreds["secretAccessKey"],
 			"AWS_SESSION_TOKEN":     assumeRoleCreds["sessionToken"],
 		}
@@ -181,13 +172,8 @@ func TestConfigureRelease(t *testing.T) {
 		response := common.CreateConfigureReleaseResponse()
 		var errorBuffer bytes.Buffer
 		h := handler.New(&handler.Opts{
-			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
-				return &mockedSTSClient{
-					creds: getIrrelevantCreds(),
-				}, nil
-			},
-			ECRClientFactory: func(map[string]string) (ecriface.ECRAPI, error) {
-				return &failingMockECRClient{}, nil
+			AWSClientFactory: func(map[string]string) handler.AWSClient {
+				return &mockAWSClientNonexistentRepo{}
 			},
 			ErrorStream: &errorBuffer,
 		})
@@ -199,7 +185,7 @@ func TestConfigureRelease(t *testing.T) {
 		if response.Success {
 			t.Fatal("unexpected success")
 		}
-		expectedMessage := "ECR repository for " + request.Component + " does not exist\n"
+		expectedMessage := fmt.Sprintf("no ecr repo for %q\n", request.Component)
 		if errorBuffer.String() != expectedMessage {
 			t.Fatalf("expected %q, got %q", expectedMessage, errorBuffer.String())
 		}
@@ -229,31 +215,33 @@ func TestConfigureRelease(t *testing.T) {
 		}
 	})
 
-	t.Run("aws credentials failing client factory", func(t *testing.T) {
-		// Given
-		request := common.CreateConfigureReleaseRequest()
-		response := common.CreateConfigureReleaseResponse()
-
-		errorText := "test-error-text"
-		var errorBuffer bytes.Buffer
-		h := handler.New(&handler.Opts{
-			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
-				return nil, fmt.Errorf(errorText)
-			},
-			ErrorStream: &errorBuffer,
-		})
-
-		// When
-		h.ConfigureRelease(request, response)
-
-		// Then
-		if response.Success {
-			t.Fatal("unexpected success")
-		}
-		if errorBuffer.String() != errorText+"\n" {
-			t.Fatalf("expected %q, got %q", errorText+"\n", errorBuffer.String())
-		}
-	})
+	// @todo move it to aws client unit test
+	//t.Run("aws credentials failing when creating AWS session on the fly", func(t *testing.T) {
+	//	// Given
+	//	request := common.CreateConfigureReleaseRequest()
+	//	response := common.CreateConfigureReleaseResponse()
+	//
+	//	errorText := "test-error-text"
+	//	var errorBuffer bytes.Buffer
+	//	h := handler.New(&handler.Opts{
+	//		STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
+	//			return nil, fmt.Errorf(errorText)
+	//		},
+	//		AWSClientFactory:
+	//		ErrorStream: &errorBuffer,
+	//	})
+	//
+	//	// When
+	//	h.ConfigureRelease(request, response)
+	//
+	//	// Then
+	//	if response.Success {
+	//		t.Fatal("unexpected success")
+	//	}
+	//	if errorBuffer.String() != errorText+"\n" {
+	//		t.Fatalf("expected %q, got %q", errorText+"\n", errorBuffer.String())
+	//	}
+	//})
 
 	t.Run("aws credentials failing client to assume role", func(t *testing.T) {
 		// Given
@@ -263,8 +251,8 @@ func TestConfigureRelease(t *testing.T) {
 		errorText := "test-error-text"
 		var errorBuffer bytes.Buffer
 		h := handler.New(&handler.Opts{
-			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
-				return &failingSTSClient{errorText: errorText}, nil
+			AWSClientFactory: func(map[string]string) handler.AWSClient {
+				return &mockAWSClientUnableToObtainRole{errorText: errorText}
 			},
 			ErrorStream: &errorBuffer,
 		})
@@ -286,13 +274,8 @@ func TestConfigureRelease(t *testing.T) {
 func createStandardHandler(assumeRoleCreds map[string]string) (*handler.Handler, *bytes.Buffer) {
 	var errorBuffer bytes.Buffer
 	return handler.New(&handler.Opts{
-		STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
-			return &mockedSTSClient{
-				creds: assumeRoleCreds,
-			}, nil
-		},
-		ECRClientFactory: func(map[string]string) (ecriface.ECRAPI, error) {
-			return &mockECRClient{componentName: "my-component"}, nil
+		AWSClientFactory: func(map[string]string) handler.AWSClient {
+			return &mockAWSClient{creds: assumeRoleCreds}
 		},
 		ErrorStream: &errorBuffer,
 	}), &errorBuffer
