@@ -222,16 +222,6 @@ func TestConfigureRelease(t *testing.T) {
 	})
 }
 
-func createFailingSTSClientFactoryHandler(errorText string) (*handler.Handler, *bytes.Buffer) {
-	var errorBuffer bytes.Buffer
-	return handler.New(&handler.Opts{
-		STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
-			return nil, fmt.Errorf(errorText)
-		},
-		ErrorStream: &errorBuffer,
-	}), &errorBuffer
-}
-
 func createStandardHandler(assumeRoleCreds map[string]string) (*handler.Handler, *bytes.Buffer) {
 	var errorBuffer bytes.Buffer
 	return handler.New(&handler.Opts{
