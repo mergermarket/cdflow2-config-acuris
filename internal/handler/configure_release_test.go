@@ -53,16 +53,10 @@ func TestConfigureRelease(t *testing.T) {
 		assumeRoleCreds["accessKeyId"] = "AccessKeyId"
 		assumeRoleCreds["secretAccessKey"] = "SecretAccessKey"
 		assumeRoleCreds["sessionToken"] = "SessionToken"
-		handler := handler.New(&handler.Opts{
-			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
-				return &mockedSTSClient{
-					creds: assumeRoleCreds,
-				}, nil
-			},
-		})
+		h, _ := createStandardHandler(assumeRoleCreds)
 
 		// When
-		handler.ConfigureRelease(request, response)
+		h.ConfigureRelease(request, response)
 
 		// Then
 		if !response.Success {
@@ -98,13 +92,7 @@ func TestConfigureRelease(t *testing.T) {
 		}
 		response := common.CreateConfigureReleaseResponse()
 
-		h := handler.New(&handler.Opts{
-			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
-				return &mockedSTSClient{
-					creds: getIrrelevantCreds(),
-				}, nil
-			},
-		})
+		h, _ := createStandardHandler(getIrrelevantCreds())
 
 		// When
 		h.ConfigureRelease(request, response)
@@ -137,15 +125,7 @@ func TestConfigureRelease(t *testing.T) {
 			"my-x": {},
 		}
 		response := common.CreateConfigureReleaseResponse()
-		var errorBuffer bytes.Buffer
-		h := handler.New(&handler.Opts{
-			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
-				return &mockedSTSClient{
-					creds: getIrrelevantCreds(),
-				}, nil
-			},
-			ErrorStream: &errorBuffer,
-		})
+		h, _ := createStandardHandler(getIrrelevantCreds())
 
 		// When
 		h.ConfigureRelease(request, response)
@@ -174,15 +154,7 @@ func TestConfigureRelease(t *testing.T) {
 		}
 		response := common.CreateConfigureReleaseResponse()
 
-		var errorBuffer bytes.Buffer
-		h := handler.New(&handler.Opts{
-			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
-				return &mockedSTSClient{
-					creds: getIrrelevantCreds(),
-				}, nil
-			},
-			ErrorStream: &errorBuffer,
-		})
+		h, errorBuffer := createStandardHandler(getIrrelevantCreds())
 
 		// When
 		h.ConfigureRelease(request, response)
@@ -198,13 +170,12 @@ func TestConfigureRelease(t *testing.T) {
 
 	t.Run("aws credentials failing client factory", func(t *testing.T) {
 		// Given
-		var errorBuffer bytes.Buffer
-
 		request := common.CreateConfigureReleaseRequest()
 		response := common.CreateConfigureReleaseResponse()
 
 		errorText := "test-error-text"
-		handler := handler.New(&handler.Opts{
+		var errorBuffer bytes.Buffer
+		h := handler.New(&handler.Opts{
 			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
 				return nil, fmt.Errorf(errorText)
 			},
@@ -212,7 +183,7 @@ func TestConfigureRelease(t *testing.T) {
 		})
 
 		// When
-		handler.ConfigureRelease(request, response)
+		h.ConfigureRelease(request, response)
 
 		// Then
 		if response.Success {
@@ -225,13 +196,12 @@ func TestConfigureRelease(t *testing.T) {
 
 	t.Run("aws credentials failing client to assume role", func(t *testing.T) {
 		// Given
-		var errorBuffer bytes.Buffer
-
 		request := common.CreateConfigureReleaseRequest()
 		response := common.CreateConfigureReleaseResponse()
 
 		errorText := "test-error-text"
-		handler := handler.New(&handler.Opts{
+		var errorBuffer bytes.Buffer
+		h := handler.New(&handler.Opts{
 			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
 				return &failingSTSClient{errorText: errorText}, nil
 			},
@@ -239,7 +209,7 @@ func TestConfigureRelease(t *testing.T) {
 		})
 
 		// When
-		handler.ConfigureRelease(request, response)
+		h.ConfigureRelease(request, response)
 
 		// Then
 		if response.Success {
@@ -250,6 +220,29 @@ func TestConfigureRelease(t *testing.T) {
 			t.Fatalf("expected %q, got %q", fullMessage, errorBuffer.String())
 		}
 	})
+}
+
+func createFailingSTSClientFactoryHandler(errorText string) (*handler.Handler, *bytes.Buffer) {
+	var errorBuffer bytes.Buffer
+	return handler.New(&handler.Opts{
+		STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
+			return nil, fmt.Errorf(errorText)
+		},
+		ErrorStream: &errorBuffer,
+	}), &errorBuffer
+}
+
+func createStandardHandler(assumeRoleCreds map[string]string) (*handler.Handler, *bytes.Buffer) {
+	var errorBuffer bytes.Buffer
+	return handler.New(&handler.Opts{
+		STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
+			return &mockedSTSClient{
+				creds: assumeRoleCreds,
+			}, nil
+
+		},
+		ErrorStream: &errorBuffer,
+	}), &errorBuffer
 }
 
 func getIrrelevantCreds() map[string]string {
