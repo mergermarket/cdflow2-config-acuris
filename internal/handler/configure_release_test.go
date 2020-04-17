@@ -126,6 +126,44 @@ func TestConfigureRelease(t *testing.T) {
 		}
 	})
 
+	t.Run("ECR build", func(t *testing.T) {
+		// Given
+		request := common.CreateConfigureReleaseRequest()
+		request.Component = "my-component"
+		request.ReleaseRequirements = map[string]map[string]interface{}{
+			"my-ecr": {
+				"needs": []string{"ecr"},
+			},
+			"my-x": {},
+		}
+		response := common.CreateConfigureReleaseResponse()
+		var errorBuffer bytes.Buffer
+		h := handler.New(&handler.Opts{
+			STSClientFactory: func(map[string]string) (stsiface.STSAPI, error) {
+				return &mockedSTSClient{
+					creds: getIrrelevantCreds(),
+				}, nil
+			},
+			ErrorStream: &errorBuffer,
+		})
+
+		// When
+		h.ConfigureRelease(request, response)
+
+		// Then
+		if !response.Success {
+			t.Fatal("unexpected failure")
+		}
+		if len(response.Env) != 2 {
+			t.Fatalf("Expected 2 builds, got %d", len(response.Env))
+		}
+		ecrRepository := response.Env["my-ecr"]["ECR_REPOSITORY"]
+		expectedRepository := "724178030834.dkr.ecr.eu-west-1.amazonaws.com/my-component"
+		if ecrRepository != expectedRepository {
+			t.Fatalf("got %q, want %q", ecrRepository, expectedRepository)
+		}
+	})
+
 	t.Run("unsupported need for a build", func(t *testing.T) {
 		// Given
 		request := common.CreateConfigureReleaseRequest()
