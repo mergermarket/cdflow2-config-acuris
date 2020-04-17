@@ -158,7 +158,7 @@ func TestConfigureRelease(t *testing.T) {
 			t.Fatalf("Expected 2 builds, got %d", len(response.Env))
 		}
 		ecrRepository := response.Env["my-ecr"]["ECR_REPOSITORY"]
-		expectedRepository := "724178030834.dkr.ecr.eu-west-1.amazonaws.com/my-component"
+		expectedRepository := fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/my-component", handler.AccountID, handler.Region)
 		if ecrRepository != expectedRepository {
 			t.Fatalf("got %q, want %q", ecrRepository, expectedRepository)
 		}

@@ -7,8 +7,6 @@ import (
 	common "github.com/mergermarket/cdflow2-config-common"
 )
 
-const DefaultLambdaBucket = "acuris-lambdas"
-
 // ConfigureRelease runs before release to configure it.
 func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse) error {
 	STSClient, err := h.STSClientFactory(request.Env)
@@ -18,7 +16,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 		return nil
 	}
 	result, err := STSClient.AssumeRole(&sts.AssumeRoleInput{
-		RoleArn:         aws.String(fmt.Sprintf("arn:aws:iam::724178030834:role/%s-deploy", request.Team)),
+		RoleArn:         aws.String(fmt.Sprintf("arn:aws:iam::%s:role/%s-deploy", AccountID, request.Team)),
 		RoleSessionName: aws.String("role-session-name"),
 	})
 	if err != nil {
@@ -46,7 +44,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 			if need == "lambda" {
 				response.Env[buildID]["LAMBDA_BUCKET"] = DefaultLambdaBucket
 			} else if need == "ecr" {
-				response.Env[buildID]["ECR_REPOSITORY"] = h.getEcrRepo(request.Component)
+				response.Env[buildID]["ECR_REPOSITORY"] = getEcrRepo(request.Component)
 			} else {
 				fmt.Fprintf(h.ErrorStream, "unable to satisfy %q need for %q build", need, buildID)
 				response.Success = false
@@ -59,8 +57,6 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 	return nil
 }
 
-func (h *Handler) getEcrRepo(componentName string) string {
-	const accountID = "724178030834"
-	const region = "eu-west-1"
-	return fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", accountID, region, componentName)
+func getEcrRepo(componentName string) string {
+	return fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", AccountID, Region, componentName)
 }

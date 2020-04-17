@@ -12,6 +12,10 @@ import (
 	common "github.com/mergermarket/cdflow2-config-common"
 )
 
+const AccountID = "724178030834"
+const Region = "eu-west-1"
+const DefaultLambdaBucket = "acuris-lambdas"
+
 // Handler handles config requests.
 type Handler struct {
 	STSClientFactory STSClientFactory
