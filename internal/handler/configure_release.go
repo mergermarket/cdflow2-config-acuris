@@ -45,6 +45,8 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 		for _, need := range listOfNeeds {
 			if need == "lambda" {
 				response.Env[buildID]["LAMBDA_BUCKET"] = DefaultLambdaBucket
+			} else if need == "ecr" {
+				response.Env[buildID]["ECR_REPOSITORY"] = h.getEcrRepo(request.Component)
 			} else {
 				fmt.Fprintf(h.ErrorStream, "unable to satisfy %q need for %q build", need, buildID)
 				response.Success = false
@@ -55,4 +57,10 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 
 	response.Success = true
 	return nil
+}
+
+func (h *Handler) getEcrRepo(componentName string) string {
+	const accountID = "724178030834"
+	const region = "eu-west-1"
+	return fmt.Sprintf("%s.dkr.ecr.%s.amazonaws.com/%s", accountID, region, componentName)
 }
