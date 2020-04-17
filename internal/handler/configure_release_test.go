@@ -144,6 +144,31 @@ func TestConfigureRelease(t *testing.T) {
 		}
 	})
 
+	t.Run("ECR build for nonexistent repo", func(t *testing.T) {
+		// Given
+		request := common.CreateConfigureReleaseRequest()
+		request.Component = "nonexistent-component"
+		request.ReleaseRequirements = map[string]map[string]interface{}{
+			"my-ecr": {
+				"needs": []string{"ecr"},
+			},
+		}
+		response := common.CreateConfigureReleaseResponse()
+		h, errorBuffer := createStandardHandler(getIrrelevantCreds())
+
+		// When
+		h.ConfigureRelease(request, response)
+
+		// Then
+		if response.Success {
+			t.Fatal("unexpected success")
+		}
+		expectedMessage := "ECR repository for " + request.Component + " does not exist\n"
+		if errorBuffer.String() != expectedMessage {
+			t.Fatalf("expected %q, got %q", expectedMessage, errorBuffer.String())
+		}
+	})
+
 	t.Run("unsupported need for a build", func(t *testing.T) {
 		// Given
 		request := common.CreateConfigureReleaseRequest()
