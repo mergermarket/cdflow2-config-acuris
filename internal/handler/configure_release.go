@@ -3,53 +3,86 @@ package handler
 import (
 	"fmt"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/client"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/ecr"
 	common "github.com/mergermarket/cdflow2-config-common"
 )
 
 // ConfigureRelease runs before release to configure it.
 func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse) error {
-	AWSClient := h.AWSClientFactory(request.Env)
-	credentials, err := AWSClient.STSAssumeRole(request.Team)
+
+	releaseAccountCredentials, err := h.getReleaseAccountCredentials(request.Env, request.Team)
 	if err != nil {
-		fmt.Fprintln(h.ErrorStream, "Unable to assume role:", err)
 		response.Success = false
+		fmt.Fprintln(h.ErrorStream, err)
 		return nil
 	}
 
+	session, err := session.NewSession(aws.NewConfig().WithCredentials(releaseAccountCredentials).WithRegion(Region))
+	if err != nil {
+		return fmt.Errorf("unable to create a new AWS session: %v", err)
+	}
+
+	releaseAccountCredentialsValue, err := releaseAccountCredentials.Get()
+	if err != nil {
+		response.Success = false
+		fmt.Fprintln(h.ErrorStream, err)
+		return nil
+	}
+
+	var ecrRepo string
+
 	for buildID, reqs := range request.ReleaseRequirements {
 		response.Env[buildID] = make(map[string]string)
-		response.Env[buildID]["AWS_ACCESS_KEY_ID"] = *credentials.AccessKeyId
-		response.Env[buildID]["AWS_SECRET_ACCESS_KEY"] = *credentials.SecretAccessKey
-		response.Env[buildID]["AWS_SESSION_TOKEN"] = *credentials.SessionToken
-		response.Env[buildID]["AWS_DEFAULT_REGION"] = Region
 
-		needs, ok := reqs["needs"]
-		if !ok {
-			continue
-		}
-		listOfNeeds, ok := needs.([]string)
-		if !ok {
-			return fmt.Errorf("unexpected type of _needs_ from %q, expected []string, got %T", buildID, reqs["needs"])
-		}
-		for _, need := range listOfNeeds {
+		for _, need := range reqs.Needs {
 			if need == "lambda" {
 				response.Env[buildID]["LAMBDA_BUCKET"] = DefaultLambdaBucket
+				setAWSEnvironmentVariables(response.Env[buildID], &releaseAccountCredentialsValue, Region)
 			} else if need == "ecr" {
-				repo, err := AWSClient.GetECRRepoURI(request.Component)
-				if err != nil {
-					response.Success = false
-					fmt.Fprintln(h.ErrorStream, err)
-					return nil
+				if ecrRepo == "" {
+					ecrRepo, err = h.getECRRepo(request.Component, session)
+					if err != nil {
+						fmt.Fprintln(h.ErrorStream, err)
+						response.Success = false
+						return nil
+					}
 				}
-				response.Env[buildID]["ECR_REPOSITORY"] = repo
+				response.Env[buildID]["ECR_REPOSITORY"] = ecrRepo
+				setAWSEnvironmentVariables(response.Env[buildID], &releaseAccountCredentialsValue, Region)
 			} else {
 				fmt.Fprintf(h.ErrorStream, "unable to satisfy %q need for %q build", need, buildID)
 				response.Success = false
 				return nil
 			}
 		}
+
 	}
 
-	response.Success = true
 	return nil
+}
+
+func setAWSEnvironmentVariables(env map[string]string, creds *credentials.Value, region string) {
+	env["AWS_ACCESS_KEY_ID"] = creds.AccessKeyID
+	env["AWS_SECRET_ACCESS_KEY"] = creds.SecretAccessKey
+	env["AWS_SESSION_TOKEN"] = creds.SessionToken
+	env["AWS_DEFAULT_REGION"] = region
+}
+
+func (h *Handler) getECRRepo(componentName string, session client.ConfigProvider) (string, error) {
+	ecrClient := h.ECRClientFactory(session)
+	response, err := ecrClient.DescribeRepositories(&ecr.DescribeRepositoriesInput{
+		RepositoryNames: []*string{aws.String(componentName)},
+	})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == ecr.ErrCodeRepositoryNotFoundException {
+			return "", fmt.Errorf("no ecr repository found for %q", componentName)
+		}
+		return "", err
+	}
+	return *response.Repositories[0].RepositoryUri, nil
 }
