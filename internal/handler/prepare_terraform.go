@@ -21,14 +21,14 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 		return nil
 	}
 
+	response.TerraformBackendType = "s3"
 	response.TerraformBackendConfig["access_key"] = releaseAccountCredentialsValue.AccessKeyID
 	response.TerraformBackendConfig["secret_key"] = releaseAccountCredentialsValue.SecretAccessKey
 	response.TerraformBackendConfig["token"] = releaseAccountCredentialsValue.SessionToken
-	// response.TerraformBackendType = "s3"
-	// response.TerraformBackendConfig["bucket"] = ""
-	// response.TerraformBackendConfig["region"] = ""
-	// response.TerraformBackendConfig["key"] = fmt.Sprintf("%s/%s/%s/terraform.tfstate")
-	// response.TerraformBackendConfig["dynamodb_table"] = ""
+	response.TerraformBackendConfig["region"] = Region
+	response.TerraformBackendConfig["bucket"] = TFStateBucket
+	response.TerraformBackendConfig["key"] = fmt.Sprintf("%s/%s/%s/terraform.tfstate", request.Team, request.Component, request.EnvName)
+	response.TerraformBackendConfig["dynamodb_table"] = fmt.Sprintf("%s-tflocks", request.Team)
 
 	return nil
 }

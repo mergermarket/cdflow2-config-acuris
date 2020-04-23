@@ -81,8 +81,8 @@ func TestConfigureRelease(t *testing.T) {
 			t.Fatalf("Expected 2 builds, got %d", len(response.Env))
 		}
 		bucketName := response.Env["my-lambda"]["LAMBDA_BUCKET"]
-		if bucketName != handler.DefaultLambdaBucket {
-			t.Fatalf("got %q, want %q", bucketName, handler.DefaultLambdaBucket)
+		if bucketName != handler.LambdaBucket {
+			t.Fatalf("got %q, want %q", bucketName, handler.LambdaBucket)
 		}
 		bucketName = response.Env["my-x"]["LAMBDA_BUCKET"]
 		if bucketName != "" {

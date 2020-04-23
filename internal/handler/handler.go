@@ -19,8 +19,9 @@ import (
 
 const AccountID = "724178030834"
 const Region = "eu-west-1"
-const DefaultLambdaBucket = "acuris-lambdas"
+const LambdaBucket = "acuris-lambdas"
 const ReleaseBucket = "acuris-releases"
+const TFStateBucket = "acuris-tfstate"
 
 // InitReleaseAccountCredentials initialises the release account credentials.
 func (h *Handler) InitReleaseAccountCredentials(env map[string]string, team string) error {

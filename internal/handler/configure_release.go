@@ -39,7 +39,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 
 		for _, need := range reqs.Needs {
 			if need == "lambda" {
-				response.Env[buildID]["LAMBDA_BUCKET"] = DefaultLambdaBucket
+				response.Env[buildID]["LAMBDA_BUCKET"] = LambdaBucket
 				setAWSEnvironmentVariables(response.Env[buildID], &releaseAccountCredentialsValue, Region)
 			} else if need == "ecr" {
 				if ecrRepo == "" {

@@ -16,6 +16,9 @@ func TestPrepareTerraform(t *testing.T) {
 	request := common.CreatePrepareTerraformRequest()
 	request.Env["AWS_ACCESS_KEY_ID"] = "root foo"
 	request.Env["AWS_SECRET_ACCESS_KEY"] = "root bar"
+	request.Team = "such-team"
+	request.Component = "such-component"
+	request.EnvName = "such-env"
 	response := common.CreatePrepareTerraformResponse()
 
 	mockAssumeRoleProviderFactory := func(session client.ConfigProvider, roleARN, roleSessionName string) credentials.Provider {
@@ -36,5 +39,13 @@ func TestPrepareTerraform(t *testing.T) {
 	}
 	if response.TerraformBackendConfig["token"] != sessionToken {
 		t.Fatalf("Want %q, got %q", sessionToken, response.TerraformBackendConfig["token"])
+	}
+	expectedKey := "such-team/such-component/such-env/terraform.tfstate"
+	if response.TerraformBackendConfig["key"] != expectedKey {
+		t.Fatalf("Want %q, got %q", expectedKey, response.TerraformBackendConfig["key"])
+	}
+	expectedDynamoDBTable := "such-team-tflocks"
+	if response.TerraformBackendConfig["dynamodb_table"] != expectedDynamoDBTable {
+		t.Fatalf("Want %q, got %q", expectedDynamoDBTable, response.TerraformBackendConfig["dynamodb_table"])
 	}
 }
