@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -9,18 +10,18 @@ import (
 )
 
 // PrepareTerraform runs before terraform to configure.
-func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, response *common.PrepareTerraformResponse) error {
+func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, response *common.PrepareTerraformResponse) (io.Reader, error) {
 	if err := h.InitReleaseAccountCredentials(request.Env, request.Team); err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
-		return nil
+		return nil, nil
 	}
 
 	releaseAccountCredentialsValue, err := h.ReleaseAccountCredentials.Get()
 	if err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
-		return nil
+		return nil, nil
 	}
 
 	response.TerraformBackendType = "s3"
@@ -34,7 +35,7 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 
 	session, err := h.createReleaseAccountSession()
 	if err != nil {
-		return fmt.Errorf("unable to create AWS session in release account: %v", err)
+		return nil, fmt.Errorf("unable to create AWS session in release account: %v", err)
 	}
 
 	s3Client := h.S3ClientFactory(session)
@@ -45,13 +46,8 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 	if err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
-		return nil
-	}
-	if err := common.UnzipRelease(getObjectOutput.Body, *getObjectOutput.ContentLength, h.ReleaseFolder, request.Component, request.Version); err != nil {
-		response.Success = false
-		fmt.Fprintln(h.ErrorStream, "error unzipping release:", err)
-		return nil
+		return nil, nil
 	}
 
-	return nil
+	return getObjectOutput.Body, nil
 }
