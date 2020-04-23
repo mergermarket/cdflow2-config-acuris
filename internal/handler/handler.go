@@ -17,11 +17,14 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 )
 
-const AccountID = "724178030834"
-const Region = "eu-west-1"
-const LambdaBucket = "acuris-lambdas"
-const ReleaseBucket = "acuris-releases"
-const TFStateBucket = "acuris-tfstate"
+const (
+	AccountID     = "724178030834"
+	LambdaBucket  = "acuris-lambdas"
+	ReleaseBucket = "acuris-releases"
+	TFStateBucket = "acuris-tfstate"
+	ReleaseFolder = "/release"
+	Region        = "eu-west-1"
+)
 
 // InitReleaseAccountCredentials initialises the release account credentials.
 func (h *Handler) InitReleaseAccountCredentials(env map[string]string, team string) error {
@@ -73,6 +76,7 @@ type Handler struct {
 	AssumeRoleProviderFactory AssumeRoleProviderFactory
 	ReleaseAccountCredentials *credentials.Credentials
 	ErrorStream               io.Writer
+	ReleaseFolder             string
 	ECRClientFactory          ECRClientFactory
 	S3ClientFactory           S3ClientFactory
 }
@@ -80,7 +84,8 @@ type Handler struct {
 // New returns a new handler.
 func New() Handler {
 	return Handler{
-		ErrorStream: os.Stderr,
+		ErrorStream:   os.Stderr,
+		ReleaseFolder: ReleaseFolder,
 		ECRClientFactory: func(session client.ConfigProvider) ecriface.ECRAPI {
 			return ecr.New(session)
 		},
@@ -122,6 +127,12 @@ func (h Handler) WithS3ClientFactory(factory S3ClientFactory) Handler {
 	return h
 }
 
-func releaseKey(team, component, version string) string {
+// WithReleaseFolder overrides the release folder.
+func (h Handler) WithReleaseFolder(folder string) Handler {
+	h.ReleaseFolder = folder
+	return h
+}
+
+func releaseS3Key(team, component, version string) string {
 	return fmt.Sprintf("%s/%s/%s-%s.zip", team, component, component, version)
 }

@@ -18,7 +18,7 @@ func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *
 	}
 
 	s3Client := h.S3ClientFactory(session)
-	key := releaseKey(configureReleaseRequest.Team, configureReleaseRequest.Component, configureReleaseRequest.Version)
+	key := releaseS3Key(configureReleaseRequest.Team, configureReleaseRequest.Component, configureReleaseRequest.Version)
 	if _, err := s3Client.PutObject(&s3.PutObjectInput{
 		Bucket: aws.String(ReleaseBucket),
 		Key:    aws.String(key),
