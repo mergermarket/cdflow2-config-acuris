@@ -4,12 +4,6 @@ github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af h1:pmfjZENx5imkbgOkpRUYLnmbU7UEFbjtDA2hxJ1ichM=
 github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af/go.mod h1:Nht3zPeWKUH0NzdCt2Blrr5ys8VGpn0CEB0cQHVjt7k=
-github.com/mergermarket/cdflow2-config-common v0.24.0 h1:1pkcmgiVc7GTlEFNUEnc8j99l+kNcaHpoGPCFrsP0wA=
-github.com/mergermarket/cdflow2-config-common v0.24.0/go.mod h1:kNBuyxspdu5cWP5e7VAmrP+5elB2wP5pHlcvLLpiyzI=
-github.com/mergermarket/cdflow2-config-common v0.27.0 h1:SGWHp7QGjvJ5HZA2ZaB/MwvTmT7i6IjoXmAw2hwYr6M=
-github.com/mergermarket/cdflow2-config-common v0.27.0/go.mod h1:kNBuyxspdu5cWP5e7VAmrP+5elB2wP5pHlcvLLpiyzI=
-github.com/mergermarket/cdflow2-config-common v0.28.0 h1:s89P+jb9D7URxNlJR2Y5ntiCN+AR/vPFmXfU20q1+rM=
-github.com/mergermarket/cdflow2-config-common v0.28.0/go.mod h1:kNBuyxspdu5cWP5e7VAmrP+5elB2wP5pHlcvLLpiyzI=
 github.com/mergermarket/cdflow2-config-common v0.29.0 h1:vDL9ispvH8e8odxgXfJrPXViuuA7wTJfBTrkilFpJvQ=
 github.com/mergermarket/cdflow2-config-common v0.29.0/go.mod h1:kNBuyxspdu5cWP5e7VAmrP+5elB2wP5pHlcvLLpiyzI=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
