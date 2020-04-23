@@ -82,8 +82,8 @@ type Handler struct {
 }
 
 // New returns a new handler.
-func New() Handler {
-	return Handler{
+func New() *Handler {
+	return &Handler{
 		ErrorStream:   os.Stderr,
 		ReleaseFolder: ReleaseFolder,
 		ECRClientFactory: func(session client.ConfigProvider) ecriface.ECRAPI {
@@ -104,31 +104,31 @@ func New() Handler {
 }
 
 // WithErrorStream overrides the stream where errors are written.
-func (h Handler) WithErrorStream(errorStream io.Writer) Handler {
+func (h *Handler) WithErrorStream(errorStream io.Writer) *Handler {
 	h.ErrorStream = errorStream
 	return h
 }
 
 // WithAssumeRoleProviderFactory overrides the function used to create an assume role provider.
-func (h Handler) WithAssumeRoleProviderFactory(factory AssumeRoleProviderFactory) Handler {
+func (h *Handler) WithAssumeRoleProviderFactory(factory AssumeRoleProviderFactory) *Handler {
 	h.AssumeRoleProviderFactory = factory
 	return h
 }
 
 // WithECRClientFactory overrides the function used to create an ECR client.
-func (h Handler) WithECRClientFactory(factory ECRClientFactory) Handler {
+func (h *Handler) WithECRClientFactory(factory ECRClientFactory) *Handler {
 	h.ECRClientFactory = factory
 	return h
 }
 
 // WithS3ClientFactory overrides the function used to create an ECR client.
-func (h Handler) WithS3ClientFactory(factory S3ClientFactory) Handler {
+func (h *Handler) WithS3ClientFactory(factory S3ClientFactory) *Handler {
 	h.S3ClientFactory = factory
 	return h
 }
 
 // WithReleaseFolder overrides the release folder.
-func (h Handler) WithReleaseFolder(folder string) Handler {
+func (h *Handler) WithReleaseFolder(folder string) *Handler {
 	h.ReleaseFolder = folder
 	return h
 }
