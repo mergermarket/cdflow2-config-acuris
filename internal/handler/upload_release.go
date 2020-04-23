@@ -10,7 +10,7 @@ import (
 )
 
 // UploadRelease runs after release to upload the release., releaseReader io.ReadSeeker
-func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *common.UploadReleaseResponse, configureReleaseRequest *common.ConfigureReleaseRequest, releaseReader io.ReadSeeker) error {
+func (h Handler) UploadRelease(request *common.UploadReleaseRequest, response *common.UploadReleaseResponse, configureReleaseRequest *common.ConfigureReleaseRequest, releaseReader io.ReadSeeker) error {
 
 	session, err := h.createReleaseAccountSession()
 	if err != nil {

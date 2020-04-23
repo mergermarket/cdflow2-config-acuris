@@ -12,7 +12,7 @@ import (
 )
 
 // ConfigureRelease runs before release to configure it.
-func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse) error {
+func (h Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse) error {
 
 	if err := h.InitReleaseAccountCredentials(request.Env, request.Team); err != nil {
 		response.Success = false

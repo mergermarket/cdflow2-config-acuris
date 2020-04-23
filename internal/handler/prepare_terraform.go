@@ -10,7 +10,7 @@ import (
 )
 
 // PrepareTerraform runs before terraform to configure.
-func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, response *common.PrepareTerraformResponse) (io.Reader, error) {
+func (h Handler) PrepareTerraform(request *common.PrepareTerraformRequest, response *common.PrepareTerraformResponse) (io.Reader, error) {
 	if err := h.InitReleaseAccountCredentials(request.Env, request.Team); err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
