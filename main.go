@@ -11,6 +11,6 @@ func main() {
 	if len(os.Args) == 2 && os.Args[1] == "forward" {
 		common.Forward(os.Stdin, os.Stdout, "")
 	} else {
-		common.Listen(handler.New(), "", nil)
+		common.Listen(handler.New(), "", "/release", nil)
 	}
 }

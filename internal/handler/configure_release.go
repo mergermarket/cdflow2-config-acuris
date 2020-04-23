@@ -7,7 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecr"
 	common "github.com/mergermarket/cdflow2-config-common"
 )
@@ -15,19 +14,18 @@ import (
 // ConfigureRelease runs before release to configure it.
 func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse) error {
 
-	releaseAccountCredentials, err := h.getReleaseAccountCredentials(request.Env, request.Team)
-	if err != nil {
+	if err := h.InitReleaseAccountCredentials(request.Env, request.Team); err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
 		return nil
 	}
 
-	session, err := session.NewSession(aws.NewConfig().WithCredentials(releaseAccountCredentials).WithRegion(Region))
+	session, err := h.createReleaseAccountSession()
 	if err != nil {
-		return fmt.Errorf("unable to create a new AWS session: %v", err)
+		return fmt.Errorf("unable to create AWS session in release account: %v", err)
 	}
 
-	releaseAccountCredentialsValue, err := releaseAccountCredentials.Get()
+	releaseAccountCredentialsValue, err := h.ReleaseAccountCredentials.Get()
 	if err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)

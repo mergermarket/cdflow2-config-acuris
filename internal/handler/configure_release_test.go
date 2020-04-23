@@ -36,18 +36,6 @@ func (m MockECRClientNoRepo) DescribeRepositories(input *ecr.DescribeRepositorie
 	return &ecr.DescribeRepositoriesOutput{}, awserr.New(ecr.ErrCodeRepositoryNotFoundException, "repository not found", nil)
 }
 
-type MockAssumeRoleProvider struct {
-	retrieve func() (credentials.Value, error)
-}
-
-func (*MockAssumeRoleProvider) IsExpired() bool {
-	return false
-}
-
-func (m *MockAssumeRoleProvider) Retrieve() (credentials.Value, error) {
-	return m.retrieve()
-}
-
 func createConfigureReleaseRequest() *common.ConfigureReleaseRequest {
 	request := common.CreateConfigureReleaseRequest()
 	request.Env["AWS_ACCESS_KEY_ID"] = "foo"
@@ -60,14 +48,8 @@ func TestConfigureRelease(t *testing.T) {
 	accessKeyID := "test-access-key-id"
 	secretAccessKey := "test-secret-access-key"
 	sessionToken := "test-session-token"
-	mockAssumeRoleProvider := &MockAssumeRoleProvider{
-		retrieve: func() (credentials.Value, error) {
-			return credentials.Value{
-				AccessKeyID:     accessKeyID,
-				SecretAccessKey: secretAccessKey,
-				SessionToken:    sessionToken,
-			}, nil
-		},
+	mockAssumeRoleProviderFactory := func(session client.ConfigProvider, roleARN, roleSessionName string) credentials.Provider {
+		return createMockAssumeRoleProvider(accessKeyID, secretAccessKey, sessionToken)
 	}
 
 	expectedEnvVars := map[string]string{
@@ -86,7 +68,7 @@ func TestConfigureRelease(t *testing.T) {
 		}
 		response := common.CreateConfigureReleaseResponse()
 
-		h := handler.New().WithAssumeRoleProvider(mockAssumeRoleProvider)
+		h := handler.New().WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory)
 
 		// When
 		h.ConfigureRelease(request, response)
@@ -124,7 +106,7 @@ func TestConfigureRelease(t *testing.T) {
 		response := common.CreateConfigureReleaseResponse()
 
 		h := handler.New().
-			WithAssumeRoleProvider(mockAssumeRoleProvider).
+			WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
 			WithECRClientFactory(func(session client.ConfigProvider) ecriface.ECRAPI {
 				return &MockECRClient{}
 			})
@@ -164,7 +146,7 @@ func TestConfigureRelease(t *testing.T) {
 
 		h := handler.New().
 			WithErrorStream(&errorBuffer).
-			WithAssumeRoleProvider(mockAssumeRoleProvider).
+			WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
 			WithECRClientFactory(func(session client.ConfigProvider) ecriface.ECRAPI {
 				return &MockECRClientNoRepo{}
 			})
@@ -194,7 +176,7 @@ func TestConfigureRelease(t *testing.T) {
 
 		h := handler.New().
 			WithErrorStream(&errorBuffer).
-			WithAssumeRoleProvider(mockAssumeRoleProvider)
+			WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory)
 
 		// When
 		h.ConfigureRelease(request, response)
