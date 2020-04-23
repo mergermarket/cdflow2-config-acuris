@@ -12,4 +12,7 @@ RUN go build -a -installsuffix cgo -o app .
 FROM scratch
 COPY --from=build /app /app
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+VOLUME /tmp
+ENV TMPDIR /tmp
+
 ENTRYPOINT ["/app"]
