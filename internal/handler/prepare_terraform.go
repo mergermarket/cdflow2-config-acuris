@@ -30,7 +30,8 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 	response.TerraformBackendConfig["token"] = releaseAccountCredentialsValue.SessionToken
 	response.TerraformBackendConfig["region"] = Region
 	response.TerraformBackendConfig["bucket"] = TFStateBucket
-	response.TerraformBackendConfig["key"] = fmt.Sprintf("%s/%s/%s/terraform.tfstate", request.Team, request.Component, request.EnvName)
+	response.TerraformBackendConfig["workspace_key_prefix"] = fmt.Sprintf("%s/%s", request.Team, request.Component)
+	response.TerraformBackendConfig["key"] = "terraform.tfstate"
 	response.TerraformBackendConfig["dynamodb_table"] = fmt.Sprintf("%s-tflocks", request.Team)
 
 	session, err := h.createReleaseAccountSession()

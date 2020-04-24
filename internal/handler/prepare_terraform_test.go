@@ -69,9 +69,13 @@ func TestPrepareTerraform(t *testing.T) {
 	if response.TerraformBackendConfig["token"] != sessionToken {
 		t.Fatalf("Want %q, got %q", sessionToken, response.TerraformBackendConfig["token"])
 	}
-	expectedKey := "such-team/such-component/such-env/terraform.tfstate"
+	expectedKey := "terraform.tfstate"
 	if response.TerraformBackendConfig["key"] != expectedKey {
 		t.Fatalf("Want %q, got %q", expectedKey, response.TerraformBackendConfig["key"])
+	}
+	expectedWorkspaceKeyPrefix := "such-team/such-component"
+	if response.TerraformBackendConfig["workspace_key_prefix"] != expectedWorkspaceKeyPrefix {
+		t.Fatalf("Want %q, got %q", expectedWorkspaceKeyPrefix, response.TerraformBackendConfig["workspace_key_prefix"])
 	}
 	expectedDynamoDBTable := "such-team-tflocks"
 	if response.TerraformBackendConfig["dynamodb_table"] != expectedDynamoDBTable {
