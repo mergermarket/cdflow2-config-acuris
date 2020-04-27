@@ -40,6 +40,7 @@ func createConfigureReleaseRequest() *common.ConfigureReleaseRequest {
 	request := common.CreateConfigureReleaseRequest()
 	request.Env["AWS_ACCESS_KEY_ID"] = "foo"
 	request.Env["AWS_SECRET_ACCESS_KEY"] = "bar"
+	request.Env["ROLE_SESSION_NAME"] = "baz"
 	return request
 }
 
