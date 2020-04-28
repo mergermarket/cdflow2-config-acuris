@@ -106,7 +106,7 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 
 	stsClient := h.STSClientFactory(session)
 	result, err := stsClient.AssumeRole(&sts.AssumeRoleInput{
-		RoleArn:         aws.String(fmt.Sprintf("arn:aws:iam::%s:role/deploy-%s", accountID, request.Team)),
+		RoleArn:         aws.String(fmt.Sprintf("arn:aws:iam::%s:role/%s-deploy", accountID, request.Team)),
 		RoleSessionName: aws.String(roleSessionName),
 	})
 	if err != nil {

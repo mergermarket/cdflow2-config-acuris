@@ -158,7 +158,7 @@ func TestPrepareTerraform(t *testing.T) {
 	if response.Env["AWS_DEFAULT_REGION"] != handler.Region {
 		t.Fatalf("Want %q, got %q", handler.Region, response.Env["AWS_DEFAULT_REGION"])
 	}
-	expectedDeployRole := fmt.Sprintf("arn:aws:iam::%s:role/deploy-such-team", deployAccountID)
+	expectedDeployRole := fmt.Sprintf("arn:aws:iam::%s:role/such-team-deploy", deployAccountID)
 	if mockSTSClient.assumedRoleArn != expectedDeployRole {
 		t.Fatalf("Want %q, got %q", expectedDeployRole, mockSTSClient.assumedRoleArn)
 	}
