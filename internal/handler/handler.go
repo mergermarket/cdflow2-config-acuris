@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecr"
 	"github.com/aws/aws-sdk-go/service/ecr/ecriface"
+	"github.com/aws/aws-sdk-go/service/organizations"
 	"github.com/aws/aws-sdk-go/service/organizations/organizationsiface"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
@@ -122,6 +123,9 @@ func New() *Handler {
 	return &Handler{
 		ErrorStream:   os.Stderr,
 		ReleaseFolder: ReleaseFolder,
+		OrganizationsClientFactory: func(session client.ConfigProvider) organizationsiface.OrganizationsAPI {
+			return organizations.New(session)
+		},
 		ECRClientFactory: func(session client.ConfigProvider) ecriface.ECRAPI {
 			return ecr.New(session)
 		},
