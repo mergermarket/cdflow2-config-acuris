@@ -73,23 +73,28 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 	}
 
 	orgsClient := h.OrganizationsClientFactory(session)
-	accounts, err := orgsClient.ListAccounts(&organizations.ListAccountsInput{})
-	if err != nil {
-		return err
-	}
+
 	var accountName string
 	if request.EnvName == "live" {
 		accountName = accountPrefix + "prod"
 	} else {
 		accountName = accountPrefix + "dev"
 	}
+
+	input := &organizations.ListAccountsInput{}
 	var accountID string
-	for _, account := range accounts.Accounts {
-		if *account.Name == accountName {
-			accountID = *account.Id
-			break
+	if err := orgsClient.ListAccountsPages(input, func(result *organizations.ListAccountsOutput, lastPage bool) bool {
+		for _, account := range result.Accounts {
+			if *account.Name == accountName {
+				accountID = *account.Id
+				return false
+			}
 		}
+		return true
+	}); err != nil {
+		return err
 	}
+
 	if accountID == "" {
 		return fmt.Errorf("account %q not found", accountName)
 	}

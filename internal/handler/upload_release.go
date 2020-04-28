@@ -10,7 +10,7 @@ import (
 )
 
 // UploadRelease runs after release to upload the release., releaseReader io.ReadSeeker
-func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *common.UploadReleaseResponse, configureReleaseRequest *common.ConfigureReleaseRequest, releaseReader io.Reader) error {
+func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *common.UploadReleaseResponse, configureReleaseRequest *common.ConfigureReleaseRequest, releaseReader io.ReadSeeker) error {
 	session, err := h.createReleaseAccountSession()
 	if err != nil {
 		return fmt.Errorf("unable to create AWS session in release account: %v", err)

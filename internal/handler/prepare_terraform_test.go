@@ -48,7 +48,7 @@ type MockOrganizationsClient struct {
 	Accounts map[string]string
 }
 
-func (m *MockOrganizationsClient) ListAccounts(input *organizations.ListAccountsInput) (*organizations.ListAccountsOutput, error) {
+func (m *MockOrganizationsClient) ListAccountsPages(input *organizations.ListAccountsInput, callback func(*organizations.ListAccountsOutput, bool) bool) error {
 	output := organizations.ListAccountsOutput{}
 	for name, id := range m.Accounts {
 		output.Accounts = append(output.Accounts, &organizations.Account{
@@ -57,7 +57,8 @@ func (m *MockOrganizationsClient) ListAccounts(input *organizations.ListAccounts
 			Status: aws.String("ACTIVE"),
 		})
 	}
-	return &output, nil
+	callback(&output, false)
+	return nil
 }
 
 func TestPrepareTerraform(t *testing.T) {
