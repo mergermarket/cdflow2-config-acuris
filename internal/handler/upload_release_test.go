@@ -9,10 +9,21 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/mergermarket/cdflow2-config-acuris/internal/handler"
 	common "github.com/mergermarket/cdflow2-config-common"
 )
+
+type MockS3Uploader struct {
+	s3manageriface.UploaderAPI
+	calls []*s3manager.UploadInput
+}
+
+func (m *MockS3Uploader) Upload(input *s3manager.UploadInput, _ ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
+	m.calls = append(m.calls, input)
+	return &s3manager.UploadOutput{}, nil
+}
 
 func TestUploadRelease(t *testing.T) {
 	// Given
@@ -28,12 +39,12 @@ func TestUploadRelease(t *testing.T) {
 	}
 
 	var errorBuffer bytes.Buffer
-	mockS3Client := &MockS3Client{}
+	mockS3Uploader := &MockS3Uploader{}
 	h := handler.New().
 		WithErrorStream(&errorBuffer).
 		WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
-		WithS3ClientFactory(func(client.ConfigProvider) s3iface.S3API {
-			return mockS3Client
+		WithS3UploaderFactory(func(client.ConfigProvider) s3manageriface.UploaderAPI {
+			return mockS3Uploader
 		})
 
 	// normally this would have happened as part of the configure release
@@ -49,10 +60,10 @@ func TestUploadRelease(t *testing.T) {
 	h.UploadRelease(request, response, configureReleaseRequest, file)
 
 	// Then
-	if len(mockS3Client.putObjectCalls) != 1 {
-		t.Fatalf("unexpected number of PutObjectCalls: %d", len(mockS3Client.putObjectCalls))
+	if len(mockS3Uploader.calls) != 1 {
+		t.Fatalf("unexpected number of calls: %d", len(mockS3Uploader.calls))
 	}
-	call := mockS3Client.putObjectCalls[0]
+	call := mockS3Uploader.calls[0]
 	if *call.Bucket != handler.ReleaseBucket {
 		t.Fatalf("got %q, expected %q", *call.Bucket, handler.ReleaseBucket)
 	}

@@ -17,6 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/organizations/organizationsiface"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
 )
@@ -89,6 +91,9 @@ type ECRClientFactory func(client.ConfigProvider) ecriface.ECRAPI
 // S3ClientFactory is a function that returns an S3 client.
 type S3ClientFactory func(client.ConfigProvider) s3iface.S3API
 
+// S3UploaderFactory is a function that returns an s3manager uploader.
+type S3UploaderFactory func(client.ConfigProvider) s3manageriface.UploaderAPI
+
 // AssumeRoleProviderFactory is a function that returns an assume role provider.
 type AssumeRoleProviderFactory func(session client.ConfigProvider, roleARN, roleSessionName string) credentials.Provider
 
@@ -107,6 +112,7 @@ type Handler struct {
 	ReleaseFolder              string
 	ECRClientFactory           ECRClientFactory
 	S3ClientFactory            S3ClientFactory
+	S3UploaderFactory          S3UploaderFactory
 	STSClientFactory           STSClientFactory
 	OrganizationsClientFactory OrganizationsClientFactory
 }
@@ -121,6 +127,9 @@ func New() *Handler {
 		},
 		S3ClientFactory: func(session client.ConfigProvider) s3iface.S3API {
 			return s3.New(session)
+		},
+		S3UploaderFactory: func(session client.ConfigProvider) s3manageriface.UploaderAPI {
+			return s3manager.NewUploaderWithClient(s3.New(session))
 		},
 		STSClientFactory: func(session client.ConfigProvider) stsiface.STSAPI {
 			return sts.New(session)
@@ -157,6 +166,12 @@ func (h *Handler) WithECRClientFactory(factory ECRClientFactory) *Handler {
 // WithS3ClientFactory overrides the function used to create an S3 client.
 func (h *Handler) WithS3ClientFactory(factory S3ClientFactory) *Handler {
 	h.S3ClientFactory = factory
+	return h
+}
+
+// WithS3UploaderFactory overrides the function used to create an S3 uploader.
+func (h *Handler) WithS3UploaderFactory(factory S3UploaderFactory) *Handler {
+	h.S3UploaderFactory = factory
 	return h
 }
 

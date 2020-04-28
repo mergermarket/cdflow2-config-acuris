@@ -2,6 +2,7 @@ FROM golang:alpine AS build
 WORKDIR /
 RUN apk add -U ca-certificates git
 ADD go.mod go.sum ./
+ADD cdflow2-config-common /cdflow2-config-common
 RUN go mod download
 ADD . .
 ENV CGO_ENABLED=0 
