@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
+	common "github.com/mergermarket/cdflow2-config-common"
 )
 
 const (
@@ -116,6 +117,8 @@ type Handler struct {
 	S3UploaderFactory          S3UploaderFactory
 	STSClientFactory           STSClientFactory
 	OrganizationsClientFactory OrganizationsClientFactory
+	ReleaseLoader              common.ReleaseLoader
+	ReleaseSaver               common.ReleaseSaver
 }
 
 // New returns a new handler.
@@ -146,6 +149,8 @@ func New() *Handler {
 				Duration:        stscreds.DefaultDuration,
 			}
 		},
+		ReleaseLoader: common.CreateReleaseLoader(),
+		ReleaseSaver:  common.CreateReleaseSaver(),
 	}
 }
 
@@ -194,6 +199,18 @@ func (h *Handler) WithOrganizationsClientFactory(factory OrganizationsClientFact
 // WithReleaseFolder overrides the release folder.
 func (h *Handler) WithReleaseFolder(folder string) *Handler {
 	h.ReleaseFolder = folder
+	return h
+}
+
+// WithReleaseLoader overrides the release loader.
+func (h *Handler) WithReleaseLoader(loader common.ReleaseLoader) *Handler {
+	h.ReleaseLoader = loader
+	return h
+}
+
+// WithReleaseSaver overrides the release saver.
+func (h *Handler) WithReleaseSaver(saver common.ReleaseSaver) *Handler {
+	h.ReleaseSaver = saver
 	return h
 }
 

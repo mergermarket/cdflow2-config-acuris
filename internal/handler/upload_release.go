@@ -2,7 +2,6 @@ package handler
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
@@ -10,16 +9,24 @@ import (
 )
 
 // UploadRelease runs after release to upload the release., releaseReader io.ReadSeeker
-func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *common.UploadReleaseResponse, configureReleaseRequest *common.ConfigureReleaseRequest, releaseReader io.ReadSeeker) error {
+func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *common.UploadReleaseResponse, configureReleaseRequest *common.ConfigureReleaseRequest, releaseDir string) error {
 	session, err := h.createReleaseAccountSession()
 	if err != nil {
 		return fmt.Errorf("unable to create AWS session in release account: %v", err)
 	}
 
 	s3Uploader := h.S3UploaderFactory(session)
-
 	key := releaseS3Key(configureReleaseRequest.Team, configureReleaseRequest.Component, configureReleaseRequest.Version)
-
+	releaseReader, err := h.ReleaseSaver.Save(
+		configureReleaseRequest.Component,
+		configureReleaseRequest.Version,
+		request.TerraformImage,
+		releaseDir,
+	)
+	if err != nil {
+		return err
+	}
+	defer releaseReader.Close()
 	if _, err := s3Uploader.Upload(&s3manager.UploadInput{
 		Bucket: aws.String(ReleaseBucket),
 		Key:    aws.String(key),

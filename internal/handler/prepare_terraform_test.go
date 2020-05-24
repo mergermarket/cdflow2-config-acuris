@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -61,18 +62,44 @@ func (m *MockOrganizationsClient) ListAccountsPages(input *organizations.ListAcc
 	return nil
 }
 
+type MockReleaseLoader struct {
+	called         bool
+	terraformImage string
+	reader         io.Reader
+	component      string
+	version        string
+	releaseDir     string
+}
+
+func (m *MockReleaseLoader) Load(reader io.Reader, component, version, releaseDir string) (string, error) {
+	if m.called {
+		log.Fatal("Load called twice")
+	}
+	m.called = true
+	m.reader = reader
+	m.component = component
+	m.version = version
+	m.releaseDir = releaseDir
+	return m.terraformImage, nil
+}
+
 func TestPrepareTerraform(t *testing.T) {
 	// Given
 
 	request := common.CreatePrepareTerraformRequest()
+	version := "test-version"
+	request.Version = version
 	request.Env["AWS_ACCESS_KEY_ID"] = "root foo"
 	request.Env["AWS_SECRET_ACCESS_KEY"] = "root bar"
 	request.Env["ROLE_SESSION_NAME"] = "baz"
-	request.Team = "such-team"
-	request.Component = "such-component"
+	team := "test-team"
+	request.Team = team
+	component := "test-component"
+	request.Component = component
 	request.EnvName = "live"
 	request.Config["accountprefix"] = "foo"
 	response := common.CreatePrepareTerraformResponse()
+	terraformImage := "test-terraform-image"
 
 	accessKeyID := "foo"
 	secretAccessKey := "bar"
@@ -111,11 +138,13 @@ func TestPrepareTerraform(t *testing.T) {
 		},
 	}
 
-	releaseFolder, err := ioutil.TempDir("", "")
+	releaseDir, err := ioutil.TempDir("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(releaseFolder)
+	defer os.RemoveAll(releaseDir)
+
+	loader := MockReleaseLoader{terraformImage: terraformImage}
 
 	h := handler.New().
 		WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
@@ -127,11 +156,11 @@ func TestPrepareTerraform(t *testing.T) {
 		}).
 		WithOrganizationsClientFactory(func(client.ConfigProvider) organizationsiface.OrganizationsAPI {
 			return mockOrganizationsClient
-		})
+		}).
+		WithReleaseLoader(&loader)
 
 	// When
-	reader, err := h.PrepareTerraform(request, response)
-	if err != nil {
+	if err := h.PrepareTerraform(request, response, releaseDir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -158,7 +187,7 @@ func TestPrepareTerraform(t *testing.T) {
 	if response.Env["AWS_DEFAULT_REGION"] != handler.Region {
 		t.Fatalf("Want %q, got %q", handler.Region, response.Env["AWS_DEFAULT_REGION"])
 	}
-	expectedDeployRole := fmt.Sprintf("arn:aws:iam::%s:role/such-team-deploy", deployAccountID)
+	expectedDeployRole := fmt.Sprintf("arn:aws:iam::%s:role/%s-deploy", deployAccountID, team)
 	if mockSTSClient.assumedRoleArn != expectedDeployRole {
 		t.Fatalf("Want %q, got %q", expectedDeployRole, mockSTSClient.assumedRoleArn)
 	}
@@ -172,16 +201,28 @@ func TestPrepareTerraform(t *testing.T) {
 		t.Fatalf("Want %q, got %q", expectedKey, response.TerraformBackendConfig["key"])
 	}
 
-	expectedWorkspaceKeyPrefix := "such-team/such-component"
+	expectedWorkspaceKeyPrefix := fmt.Sprintf("%s/%s", team, component)
 	if response.TerraformBackendConfig["workspace_key_prefix"] != expectedWorkspaceKeyPrefix {
 		t.Fatalf("Want %q, got %q", expectedWorkspaceKeyPrefix, response.TerraformBackendConfig["workspace_key_prefix"])
 	}
 
-	expectedDynamoDBTable := "such-team-tflocks"
+	expectedDynamoDBTable := team + "-tflocks"
 	if response.TerraformBackendConfig["dynamodb_table"] != expectedDynamoDBTable {
 		t.Fatalf("Want %q, got %q", expectedDynamoDBTable, response.TerraformBackendConfig["dynamodb_table"])
 	}
-	if file != reader {
-		t.Fatalf("got %v, wanted %v", reader, file)
+	if response.TerraformImage != terraformImage {
+		t.Fatalf("Want %q, got %q", terraformImage, response.TerraformImage)
+	}
+	if loader.component != component {
+		t.Fatalf("Want %q, got %q", component, loader.component)
+	}
+	if loader.version != version {
+		t.Fatalf("Want %q, got %q", version, loader.version)
+	}
+	if loader.releaseDir != releaseDir {
+		t.Fatalf("Want %q, got %q", releaseDir, loader.releaseDir)
+	}
+	if loader.reader != file {
+		t.Fatalf("Want %v, got %v", file, loader.reader)
 	}
 }
