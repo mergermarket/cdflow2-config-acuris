@@ -178,6 +178,9 @@ func TestConfigureRelease(t *testing.T) {
 		if *ecrClient.CreateRepositoryInput.RepositoryName != expectedRepoName {
 			t.Fatalf("expected %q, got %q", expectedRepoName, *ecrClient.CreateRepositoryInput.RepositoryName)
 		}
+		if !*ecrClient.CreateRepositoryInput.ImageScanningConfiguration.ScanOnPush {
+			t.Fatalf("expected scan on push to be on")
+		}
 	})
 
 	t.Run("unsupported need for a build", func(t *testing.T) {

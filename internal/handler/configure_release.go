@@ -90,6 +90,9 @@ func (h *Handler) getECRRepo(teamName, componentName string, session client.Conf
 func (h *Handler) createECRRepo(name string, ecrClient ecriface.ECRAPI) (string, error) {
 	response, err := ecrClient.CreateRepository(&ecr.CreateRepositoryInput{
 		RepositoryName: aws.String(name),
+		ImageScanningConfiguration: &ecr.ImageScanningConfiguration{
+			ScanOnPush: aws.Bool(true),
+		},
 	})
 	if err != nil {
 		return "", err
