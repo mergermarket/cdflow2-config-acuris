@@ -2,7 +2,6 @@ package handler_test
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -30,10 +29,23 @@ func (*MockECRClient) DescribeRepositories(input *ecr.DescribeRepositoriesInput)
 
 type MockECRClientNoRepo struct {
 	ecriface.ECRAPI
+	CreateRepositoryInput *ecr.CreateRepositoryInput
 }
 
-func (m MockECRClientNoRepo) DescribeRepositories(input *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
+func (m *MockECRClientNoRepo) DescribeRepositories(input *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
 	return &ecr.DescribeRepositoriesOutput{}, awserr.New(ecr.ErrCodeRepositoryNotFoundException, "repository not found", nil)
+}
+
+func (m *MockECRClientNoRepo) CreateRepository(input *ecr.CreateRepositoryInput) (*ecr.CreateRepositoryOutput, error) {
+	if m.CreateRepositoryInput != nil {
+		panic("CreateRepository already called")
+	}
+	m.CreateRepositoryInput = input
+	return &ecr.CreateRepositoryOutput{
+		Repository: &ecr.Repository{
+			RepositoryUri: aws.String("repo:" + *input.RepositoryName),
+		},
+	}, nil
 }
 
 func createConfigureReleaseRequest() *common.ConfigureReleaseRequest {
@@ -100,6 +112,7 @@ func TestConfigureRelease(t *testing.T) {
 		// Given
 		request := createConfigureReleaseRequest()
 		request.Component = "my-component"
+		request.Team = "my-team"
 		request.ReleaseRequirements = map[string]*common.ReleaseRequirements{
 			"my-ecr": {Needs: []string{"ecr"}},
 			"my-x":   {},
@@ -123,7 +136,7 @@ func TestConfigureRelease(t *testing.T) {
 			t.Fatalf("Expected 2 builds, got %d", len(response.Env))
 		}
 		ecrRepository := response.Env["my-ecr"]["ECR_REPOSITORY"]
-		expectedRepository := "repo:my-component"
+		expectedRepository := "repo:" + request.Team + "-" + request.Component
 		if ecrRepository != expectedRepository {
 			t.Fatalf("got %q, want %q", ecrRepository, expectedRepository)
 		}
@@ -137,7 +150,8 @@ func TestConfigureRelease(t *testing.T) {
 	t.Run("ECR build for nonexistent repo", func(t *testing.T) {
 		// Given
 		request := createConfigureReleaseRequest()
-		request.Component = "nonexistent-component"
+		request.Component = "test-component"
+		request.Team = "test-team"
 		request.ReleaseRequirements = map[string]*common.ReleaseRequirements{
 			"my-ecr": {Needs: []string{"ecr"}},
 		}
@@ -145,23 +159,24 @@ func TestConfigureRelease(t *testing.T) {
 
 		var errorBuffer bytes.Buffer
 
+		var ecrClient MockECRClientNoRepo
 		h := handler.New().
 			WithErrorStream(&errorBuffer).
 			WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
 			WithECRClientFactory(func(session client.ConfigProvider) ecriface.ECRAPI {
-				return &MockECRClientNoRepo{}
+				return &ecrClient
 			})
 
 		// When
 		h.ConfigureRelease(request, response)
 
 		// Then
-		if response.Success {
-			t.Fatal("unexpected success")
+		if ecrClient.CreateRepositoryInput == nil {
+			t.Fatal("CreateRepository not called")
 		}
-		expectedMessage := fmt.Sprintf("no ecr repository found for %q\n", request.Component)
-		if errorBuffer.String() != expectedMessage {
-			t.Fatalf("expected %q, got %q", expectedMessage, errorBuffer.String())
+		expectedRepoName := request.Team + "-" + request.Component
+		if *ecrClient.CreateRepositoryInput.RepositoryName != expectedRepoName {
+			t.Fatalf("expected %q, got %q", expectedRepoName, *ecrClient.CreateRepositoryInput.RepositoryName)
 		}
 	})
 

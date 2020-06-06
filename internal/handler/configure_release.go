@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/ecr"
+	"github.com/aws/aws-sdk-go/service/ecr/ecriface"
 	common "github.com/mergermarket/cdflow2-config-common"
 )
 
@@ -43,7 +44,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 				setAWSEnvironmentVariables(response.Env[buildID], &releaseAccountCredentialsValue, Region)
 			} else if need == "ecr" {
 				if ecrRepo == "" {
-					ecrRepo, err = h.getECRRepo(request.Component, session)
+					ecrRepo, err = h.getECRRepo(request.Team, request.Component, session)
 					if err != nil {
 						fmt.Fprintln(h.ErrorStream, err)
 						response.Success = false
@@ -71,16 +72,27 @@ func setAWSEnvironmentVariables(env map[string]string, creds *credentials.Value,
 	env["AWS_DEFAULT_REGION"] = region
 }
 
-func (h *Handler) getECRRepo(componentName string, session client.ConfigProvider) (string, error) {
+func (h *Handler) getECRRepo(teamName, componentName string, session client.ConfigProvider) (string, error) {
+	name := teamName + "-" + componentName
 	ecrClient := h.ECRClientFactory(session)
 	response, err := ecrClient.DescribeRepositories(&ecr.DescribeRepositoriesInput{
-		RepositoryNames: []*string{aws.String(componentName)},
+		RepositoryNames: []*string{aws.String(name)},
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == ecr.ErrCodeRepositoryNotFoundException {
-			return "", fmt.Errorf("no ecr repository found for %q", componentName)
+			return h.createECRRepo(name, ecrClient)
 		}
 		return "", err
 	}
 	return *response.Repositories[0].RepositoryUri, nil
+}
+
+func (h *Handler) createECRRepo(name string, ecrClient ecriface.ECRAPI) (string, error) {
+	response, err := ecrClient.CreateRepository(&ecr.CreateRepositoryInput{
+		RepositoryName: aws.String(name),
+	})
+	if err != nil {
+		return "", err
+	}
+	return *response.Repository.RepositoryUri, nil
 }
