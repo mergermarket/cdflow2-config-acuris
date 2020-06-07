@@ -27,9 +27,23 @@ func (*MockECRClient) DescribeRepositories(input *ecr.DescribeRepositoriesInput)
 	}, nil
 }
 
+const expectedPolicyDocument = "{\"rules\":[{\"rulePriority\":0,\"Selection\":{\"tagStatus\":\"TAGGED\",\"tagPrefixList\":[\"my-ecr-\"],\"countType\":\"imageCountMoreThan\",\"countNumber\":50},\"action\":{\"type\":\"expire\"}}]}"
+
+func (*MockECRClient) GetLifecyclePolicy(input *ecr.GetLifecyclePolicyInput) (*ecr.GetLifecyclePolicyOutput, error) {
+	return &ecr.GetLifecyclePolicyOutput{
+		LifecyclePolicyText: aws.String(expectedPolicyDocument),
+	}, nil
+}
+
+func (*MockECRClient) PutLifecyclePolicy(input *ecr.PutLifecyclePolicyInput) (*ecr.PutLifecyclePolicyOutput, error) {
+	panic("unexpected call")
+}
+
 type MockECRClientNoRepo struct {
 	ecriface.ECRAPI
-	CreateRepositoryInput *ecr.CreateRepositoryInput
+	CreateRepositoryInput   *ecr.CreateRepositoryInput
+	PutLifecyclePolicyInput *ecr.PutLifecyclePolicyInput
+	repositoryName          string
 }
 
 func (m *MockECRClientNoRepo) DescribeRepositories(input *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
@@ -41,11 +55,27 @@ func (m *MockECRClientNoRepo) CreateRepository(input *ecr.CreateRepositoryInput)
 		panic("CreateRepository already called")
 	}
 	m.CreateRepositoryInput = input
+	m.repositoryName = *input.RepositoryName
 	return &ecr.CreateRepositoryOutput{
 		Repository: &ecr.Repository{
 			RepositoryUri: aws.String("repo:" + *input.RepositoryName),
 		},
 	}, nil
+}
+
+func (m *MockECRClientNoRepo) GetLifecyclePolicy(input *ecr.GetLifecyclePolicyInput) (*ecr.GetLifecyclePolicyOutput, error) {
+	return nil, awserr.New(ecr.ErrCodeLifecyclePolicyNotFoundException, "", nil)
+}
+
+func (m *MockECRClientNoRepo) PutLifecyclePolicy(input *ecr.PutLifecyclePolicyInput) (*ecr.PutLifecyclePolicyOutput, error) {
+	if m.PutLifecyclePolicyInput != nil {
+		panic("PutLifecyclePolicy already called")
+	}
+	if m.CreateRepositoryInput == nil {
+		panic("PutLifeCyclePolicy called before CreateRepository")
+	}
+	m.PutLifecyclePolicyInput = input
+	return &ecr.PutLifecyclePolicyOutput{}, nil
 }
 
 func createConfigureReleaseRequest() *common.ConfigureReleaseRequest {
@@ -180,6 +210,15 @@ func TestConfigureRelease(t *testing.T) {
 		}
 		if !*ecrClient.CreateRepositoryInput.ImageScanningConfiguration.ScanOnPush {
 			t.Fatalf("expected scan on push to be on")
+		}
+		if *ecrClient.CreateRepositoryInput.ImageTagMutability != "IMMUTABLE" {
+			t.Fatalf("expected %q, got %q", "IMMUTABLE", *ecrClient.CreateRepositoryInput.ImageTagMutability)
+		}
+		if *ecrClient.PutLifecyclePolicyInput.RepositoryName != expectedRepoName {
+			t.Fatalf("expected %q, got %q", expectedRepoName, *ecrClient.PutLifecyclePolicyInput.RepositoryName)
+		}
+		if *ecrClient.PutLifecyclePolicyInput.LifecyclePolicyText != expectedPolicyDocument {
+			t.Fatalf("expected %q, got %q", expectedPolicyDocument, *ecrClient.PutLifecyclePolicyInput.LifecyclePolicyText)
 		}
 	})
 
