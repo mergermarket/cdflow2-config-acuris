@@ -166,6 +166,24 @@ func (h *Handler) getECRRepo(repoName string, ecrClient ecriface.ECRAPI) (string
 		}
 		return "", err
 	}
+	if !*response.Repositories[0].ImageScanningConfiguration.ScanOnPush {
+		if _, err := ecrClient.PutImageScanningConfiguration(&ecr.PutImageScanningConfigurationInput{
+			RepositoryName: aws.String(repoName),
+			ImageScanningConfiguration: &ecr.ImageScanningConfiguration{
+				ScanOnPush: aws.Bool(true),
+			},
+		}); err != nil {
+			return "", err
+		}
+	}
+	if *response.Repositories[0].ImageTagMutability != "IMMUTABLE" {
+		if _, err := ecrClient.PutImageTagMutability(&ecr.PutImageTagMutabilityInput{
+			RepositoryName:     aws.String(repoName),
+			ImageTagMutability: aws.String("IMMUTABLE"),
+		}); err != nil {
+			return "", err
+		}
+	}
 	return *response.Repositories[0].RepositoryUri, nil
 }
 

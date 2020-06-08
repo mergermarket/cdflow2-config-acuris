@@ -17,12 +17,23 @@ import (
 
 type MockECRClient struct {
 	ecriface.ECRAPI
+	PutLifecyclePolicyInput            *ecr.PutLifecyclePolicyInput
+	PutImageScanningConfigurationInput *ecr.PutImageScanningConfigurationInput
+	PutImageTagMutabilityInput         *ecr.PutImageTagMutabilityInput
+	DefaultMutability                  string
+	DefaultScanOnPush                  bool
 }
 
-func (*MockECRClient) DescribeRepositories(input *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
+func (m *MockECRClient) DescribeRepositories(input *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
 	return &ecr.DescribeRepositoriesOutput{
 		Repositories: []*ecr.Repository{
-			{RepositoryUri: aws.String("repo:" + *input.RepositoryNames[0])},
+			{
+				RepositoryUri: aws.String("repo:" + *input.RepositoryNames[0]),
+				ImageScanningConfiguration: &ecr.ImageScanningConfiguration{
+					ScanOnPush: aws.Bool(m.DefaultScanOnPush),
+				},
+				ImageTagMutability: aws.String(m.DefaultMutability),
+			},
 		},
 	}, nil
 }
@@ -35,8 +46,28 @@ func (*MockECRClient) GetLifecyclePolicy(input *ecr.GetLifecyclePolicyInput) (*e
 	}, nil
 }
 
-func (*MockECRClient) PutLifecyclePolicy(input *ecr.PutLifecyclePolicyInput) (*ecr.PutLifecyclePolicyOutput, error) {
-	panic("unexpected call")
+func (m *MockECRClient) PutLifecyclePolicy(input *ecr.PutLifecyclePolicyInput) (*ecr.PutLifecyclePolicyOutput, error) {
+	if m.PutLifecyclePolicyInput != nil {
+		panic("PutLifecyclePolicy already called")
+	}
+	m.PutLifecyclePolicyInput = input
+	return &ecr.PutLifecyclePolicyOutput{}, nil
+}
+
+func (m *MockECRClient) PutImageTagMutability(input *ecr.PutImageTagMutabilityInput) (*ecr.PutImageTagMutabilityOutput, error) {
+	if m.PutImageTagMutabilityInput != nil {
+		panic("PutImageTagMutability already called")
+	}
+	m.PutImageTagMutabilityInput = input
+	return &ecr.PutImageTagMutabilityOutput{}, nil
+}
+
+func (m *MockECRClient) PutImageScanningConfiguration(input *ecr.PutImageScanningConfigurationInput) (*ecr.PutImageScanningConfigurationOutput, error) {
+	if m.PutImageScanningConfigurationInput != nil {
+		panic("PutImageScanningConfiguration already called")
+	}
+	m.PutImageScanningConfigurationInput = input
+	return &ecr.PutImageScanningConfigurationOutput{}, nil
 }
 
 type MockECRClientNoRepo struct {
@@ -149,10 +180,14 @@ func TestConfigureRelease(t *testing.T) {
 		}
 		response := common.CreateConfigureReleaseResponse()
 
+		ecrClient := &MockECRClient{
+			DefaultMutability: "IMMUTABLE",
+			DefaultScanOnPush: true,
+		}
 		h := handler.New().
 			WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
 			WithECRClientFactory(func(session client.ConfigProvider) ecriface.ECRAPI {
-				return &MockECRClient{}
+				return ecrClient
 			})
 
 		// When
@@ -174,6 +209,61 @@ func TestConfigureRelease(t *testing.T) {
 			if response.Env["my-ecr"][name] != value {
 				t.Fatalf("got %q for %q, expected %q", response.Env["my-ecr"][name], name, value)
 			}
+		}
+		if ecrClient.PutImageTagMutabilityInput != nil {
+			t.Fatalf("unexpected call to PutImageTagMutability")
+		}
+		if ecrClient.PutImageScanningConfigurationInput != nil {
+			t.Fatalf("unexpected call to PutImageTagMutability")
+		}
+	})
+
+	t.Run("ECR build put mutability and scanning", func(t *testing.T) {
+		// Given
+		request := createConfigureReleaseRequest()
+		request.Component = "my-component"
+		request.Team = "my-team"
+		request.ReleaseRequirements = map[string]*common.ReleaseRequirements{
+			"my-ecr": {Needs: []string{"ecr"}},
+			"my-x":   {},
+		}
+		response := common.CreateConfigureReleaseResponse()
+
+		ecrClient := &MockECRClient{
+			DefaultMutability: "MUTABLE",
+			DefaultScanOnPush: false,
+		}
+		h := handler.New().
+			WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
+			WithECRClientFactory(func(session client.ConfigProvider) ecriface.ECRAPI {
+				return ecrClient
+			})
+
+		// When
+		h.ConfigureRelease(request, response)
+
+		// Then
+		if !response.Success {
+			t.Fatal("unexpected failure")
+		}
+		expectedRepoName := "my-team-my-component"
+		if ecrClient.PutImageTagMutabilityInput == nil {
+			t.Fatalf("missing call to PutImageTagMutability")
+		}
+		if *ecrClient.PutImageTagMutabilityInput.RepositoryName != expectedRepoName {
+			t.Fatalf("expected %q, got %q", expectedRepoName, *ecrClient.PutImageTagMutabilityInput.RepositoryName)
+		}
+		if *ecrClient.PutImageTagMutabilityInput.ImageTagMutability != "IMMUTABLE" {
+			t.Fatalf("expected %q, got %q", "IMMUTABLE", *ecrClient.PutImageTagMutabilityInput.ImageTagMutability)
+		}
+		if ecrClient.PutImageScanningConfigurationInput == nil {
+			t.Fatalf("missing call to PutImageTagMutability")
+		}
+		if *ecrClient.PutImageScanningConfigurationInput.RepositoryName != expectedRepoName {
+			t.Fatalf("expected %q, got %q", expectedRepoName, *ecrClient.PutImageScanningConfigurationInput.RepositoryName)
+		}
+		if !*ecrClient.PutImageScanningConfigurationInput.ImageScanningConfiguration.ScanOnPush {
+			t.Fatalf("expected scan on push to be true")
 		}
 	})
 
