@@ -93,7 +93,7 @@ func TestPrepareTerraform(t *testing.T) {
 	request.Env["AWS_SECRET_ACCESS_KEY"] = "root bar"
 	request.Env["ROLE_SESSION_NAME"] = "baz"
 	team := "test-team"
-	request.Team = team
+	request.Config["team"] = team
 	component := "test-component"
 	request.Component = component
 	request.EnvName = "live"

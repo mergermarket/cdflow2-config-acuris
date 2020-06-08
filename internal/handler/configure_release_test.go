@@ -140,6 +140,7 @@ func TestConfigureRelease(t *testing.T) {
 			"my-lambda": {Needs: []string{"lambda"}},
 			"my-x":      {},
 		}
+		request.Config["team"] = "test-team"
 		response := common.CreateConfigureReleaseResponse()
 
 		h := handler.New().WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory)
@@ -173,7 +174,8 @@ func TestConfigureRelease(t *testing.T) {
 		// Given
 		request := createConfigureReleaseRequest()
 		request.Component = "my-component"
-		request.Team = "my-team"
+		team := "my-team"
+		request.Config["team"] = team
 		request.ReleaseRequirements = map[string]*common.ReleaseRequirements{
 			"my-ecr": {Needs: []string{"ecr"}},
 			"my-x":   {},
@@ -201,7 +203,7 @@ func TestConfigureRelease(t *testing.T) {
 			t.Fatalf("Expected 2 builds, got %d", len(response.Env))
 		}
 		ecrRepository := response.Env["my-ecr"]["ECR_REPOSITORY"]
-		expectedRepository := "repo:" + request.Team + "-" + request.Component
+		expectedRepository := "repo:" + team + "-" + request.Component
 		if ecrRepository != expectedRepository {
 			t.Fatalf("got %q, want %q", ecrRepository, expectedRepository)
 		}
@@ -222,7 +224,8 @@ func TestConfigureRelease(t *testing.T) {
 		// Given
 		request := createConfigureReleaseRequest()
 		request.Component = "my-component"
-		request.Team = "my-team"
+		team := "my-team"
+		request.Config["team"] = team
 		request.ReleaseRequirements = map[string]*common.ReleaseRequirements{
 			"my-ecr": {Needs: []string{"ecr"}},
 			"my-x":   {},
@@ -271,7 +274,8 @@ func TestConfigureRelease(t *testing.T) {
 		// Given
 		request := createConfigureReleaseRequest()
 		request.Component = "test-component"
-		request.Team = "test-team"
+		team := "test-team"
+		request.Config["team"] = team
 		request.ReleaseRequirements = map[string]*common.ReleaseRequirements{
 			"my-ecr": {Needs: []string{"ecr"}},
 		}
@@ -294,7 +298,7 @@ func TestConfigureRelease(t *testing.T) {
 		if ecrClient.CreateRepositoryInput == nil {
 			t.Fatal("CreateRepository not called")
 		}
-		expectedRepoName := request.Team + "-" + request.Component
+		expectedRepoName := team + "-" + request.Component
 		if *ecrClient.CreateRepositoryInput.RepositoryName != expectedRepoName {
 			t.Fatalf("expected %q, got %q", expectedRepoName, *ecrClient.CreateRepositoryInput.RepositoryName)
 		}
@@ -318,6 +322,7 @@ func TestConfigureRelease(t *testing.T) {
 		request.ReleaseRequirements = map[string]*common.ReleaseRequirements{
 			"something": {Needs: []string{"unsupported"}},
 		}
+		request.Config["team"] = "test-team"
 		response := common.CreateConfigureReleaseResponse()
 
 		var errorBuffer bytes.Buffer

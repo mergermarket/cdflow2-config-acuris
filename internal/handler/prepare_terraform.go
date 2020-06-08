@@ -12,7 +12,14 @@ import (
 
 // PrepareTerraform runs before terraform to configure.
 func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, response *common.PrepareTerraformResponse, releaseDir string) error {
-	if err := h.InitReleaseAccountCredentials(request.Env, request.Team); err != nil {
+	team, err := h.getTeam(request.Config["team"])
+	if err != nil {
+		response.Success = false
+		fmt.Fprintln(h.ErrorStream, err)
+		return nil
+	}
+
+	if err := h.InitReleaseAccountCredentials(request.Env, team); err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
 		return nil
@@ -31,9 +38,9 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 	response.TerraformBackendConfig["token"] = releaseAccountCredentialsValue.SessionToken
 	response.TerraformBackendConfig["region"] = Region
 	response.TerraformBackendConfig["bucket"] = TFStateBucket
-	response.TerraformBackendConfig["workspace_key_prefix"] = fmt.Sprintf("%s/%s", request.Team, request.Component)
+	response.TerraformBackendConfig["workspace_key_prefix"] = fmt.Sprintf("%s/%s", team, request.Component)
 	response.TerraformBackendConfig["key"] = "terraform.tfstate"
-	response.TerraformBackendConfig["dynamodb_table"] = fmt.Sprintf("%s-tflocks", request.Team)
+	response.TerraformBackendConfig["dynamodb_table"] = fmt.Sprintf("%s-tflocks", team)
 
 	session, err := h.createReleaseAccountSession()
 	if err != nil {
@@ -43,7 +50,7 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 	s3Client := h.S3ClientFactory(session)
 	getObjectOutput, err := s3Client.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(ReleaseBucket),
-		Key:    aws.String(releaseS3Key(request.Team, request.Component, request.Version)),
+		Key:    aws.String(releaseS3Key(team, request.Component, request.Version)),
 	})
 	if err != nil {
 		response.Success = false
@@ -51,7 +58,7 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 		return nil
 	}
 
-	if err := h.AddDeployAccountCredentialsValue(request, response.Env); err != nil {
+	if err := h.AddDeployAccountCredentialsValue(request, team, response.Env); err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
 		return nil
@@ -67,7 +74,7 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 }
 
 // AddDeployAccountCredentialsValue assumes a role in the right account and returns credentials.
-func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraformRequest, responseEnv map[string]string) error {
+func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraformRequest, team string, responseEnv map[string]string) error {
 	accountPrefix, ok := request.Config["accountprefix"].(string)
 	if !ok || accountPrefix == "" {
 		return fmt.Errorf("config.params.accountprefix must be set and be a string value")
@@ -111,7 +118,7 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 
 	stsClient := h.STSClientFactory(session)
 	result, err := stsClient.AssumeRole(&sts.AssumeRoleInput{
-		RoleArn:         aws.String(fmt.Sprintf("arn:aws:iam::%s:role/%s-deploy", accountID, request.Team)),
+		RoleArn:         aws.String(fmt.Sprintf("arn:aws:iam::%s:role/%s-deploy", accountID, team)),
 		RoleSessionName: aws.String(roleSessionName),
 	})
 	if err != nil {

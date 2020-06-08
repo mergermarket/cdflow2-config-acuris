@@ -56,7 +56,7 @@ func TestUploadRelease(t *testing.T) {
 	component := "test-component"
 	version := "test-version"
 	terraformImage := "test-terraform-image"
-	configureReleaseRequest.Team = team
+	configureReleaseRequest.Config["team"] = team
 	configureReleaseRequest.Component = component
 	configureReleaseRequest.Version = version
 	request.TerraformImage = terraformImage

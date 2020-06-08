@@ -248,3 +248,11 @@ func GetRoleSessionName(env map[string]string) (string, error) {
 	}
 	return value, nil
 }
+
+func (h *Handler) getTeam(team interface{}) (string, error) {
+	teamString, ok := team.(string)
+	if !ok || teamString == "" {
+		return "", fmt.Errorf("cdflow.yaml error: config.params.team must be set to a non-empty string")
+	}
+	return teamString, nil
+}

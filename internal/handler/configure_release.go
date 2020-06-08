@@ -17,7 +17,14 @@ import (
 // ConfigureRelease runs before release to configure it.
 func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse) error {
 
-	if err := h.InitReleaseAccountCredentials(request.Env, request.Team); err != nil {
+	team, err := h.getTeam(request.Config["team"])
+	if err != nil {
+		response.Success = false
+		fmt.Fprintln(h.ErrorStream, err)
+		return nil
+	}
+
+	if err := h.InitReleaseAccountCredentials(request.Env, team); err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
 		return nil
@@ -55,7 +62,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 	}
 	if len(ecrBuilds) != 0 {
 		sort.Strings(ecrBuilds)
-		if err := h.setupECR(request, response, session, ecrBuilds); err != nil {
+		if err := h.setupECR(request.Component, request.Version, team, response, session, ecrBuilds); err != nil {
 			fmt.Fprintln(h.ErrorStream, err)
 			response.Success = false
 			return nil
@@ -64,9 +71,9 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 	return nil
 }
 
-func (h *Handler) setupECR(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse, session client.ConfigProvider, ecrBuilds []string) error {
+func (h *Handler) setupECR(component, version, team string, response *common.ConfigureReleaseResponse, session client.ConfigProvider, ecrBuilds []string) error {
 	ecrClient := h.ECRClientFactory(session)
-	repoName := request.Team + "-" + request.Component
+	repoName := team + "-" + component
 	repoURI, err := h.getECRRepo(repoName, ecrClient)
 	if err != nil {
 		return err
@@ -76,7 +83,7 @@ func (h *Handler) setupECR(request *common.ConfigureReleaseRequest, response *co
 	}
 	for _, buildID := range ecrBuilds {
 		response.Env[buildID]["ECR_REPOSITORY"] = repoURI
-		response.Env[buildID]["ECR_TAG"] = buildID + "-" + request.Version
+		response.Env[buildID]["ECR_TAG"] = buildID + "-" + version
 	}
 	return nil
 }

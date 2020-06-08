@@ -10,13 +10,20 @@ import (
 
 // UploadRelease runs after release to upload the release., releaseReader io.ReadSeeker
 func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *common.UploadReleaseResponse, configureReleaseRequest *common.ConfigureReleaseRequest, releaseDir string) error {
+	team, err := h.getTeam(configureReleaseRequest.Config["team"])
+	if err != nil {
+		response.Success = false
+		fmt.Fprintln(h.ErrorStream, err)
+		return nil
+	}
+
 	session, err := h.createReleaseAccountSession()
 	if err != nil {
 		return fmt.Errorf("unable to create AWS session in release account: %v", err)
 	}
 
 	s3Uploader := h.S3UploaderFactory(session)
-	key := releaseS3Key(configureReleaseRequest.Team, configureReleaseRequest.Component, configureReleaseRequest.Version)
+	key := releaseS3Key(team, configureReleaseRequest.Component, configureReleaseRequest.Version)
 	releaseReader, err := h.ReleaseSaver.Save(
 		configureReleaseRequest.Component,
 		configureReleaseRequest.Version,
