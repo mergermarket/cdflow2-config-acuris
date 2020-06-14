@@ -140,7 +140,8 @@ func TestConfigureRelease(t *testing.T) {
 			"my-lambda": {Needs: []string{"lambda"}},
 			"my-x":      {},
 		}
-		request.Config["team"] = "test-team"
+		team := "test-team"
+		request.Config["team"] = team
 		response := common.CreateConfigureReleaseResponse()
 
 		h := handler.New().WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory)
@@ -167,6 +168,9 @@ func TestConfigureRelease(t *testing.T) {
 			if response.Env["my-lambda"][name] != value {
 				t.Fatalf("got %q for %q, expected %q", response.Env["my-lambda"][name], name, value)
 			}
+		}
+		if response.AdditionalMetadata["team"] != team {
+			t.Fatalf("expected %q, got %q", team, response.AdditionalMetadata["team"])
 		}
 	})
 

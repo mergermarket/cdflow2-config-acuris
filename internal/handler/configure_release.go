@@ -24,6 +24,8 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 		return nil
 	}
 
+	response.AdditionalMetadata["team"] = team
+
 	if err := h.InitReleaseAccountCredentials(request.Env, team); err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
