@@ -73,12 +73,27 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 	return nil
 }
 
+func (h *Handler) addRootAccountCredentials(requestEnv map[string]string, responseEnv map[string]string) error {
+	if requestEnv["AWS_ACCESS_KEY_ID"] == "" || requestEnv["AWS_SECRET_ACCESS_KEY"] == "" {
+		return fmt.Errorf("AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY not found in env")
+	}
+	responseEnv["AWS_ACCESS_KEY_ID"] = requestEnv["AWS_ACCESS_KEY_ID"]
+	responseEnv["AWS_SECRET_ACCESS_KEY"] = requestEnv["AWS_SECRET_ACCESS_KEY"]
+	responseEnv["AWS_SESSION_TOKEN"] = requestEnv["AWS_SESSION_TOKEN"]
+	responseEnv["AWS_DEFAULT_REGION"] = Region
+	return nil
+}
+
 // AddDeployAccountCredentialsValue assumes a role in the right account and returns credentials.
 func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraformRequest, team string, responseEnv map[string]string) error {
-	accountPrefix, ok := request.Config["accountprefix"].(string)
+	accountPrefix, ok := request.Config["account-prefix"].(string)
 	if !ok || accountPrefix == "" {
-		return fmt.Errorf("config.params.accountprefix must be set and be a string value")
+		return fmt.Errorf("cdflow.yaml: error - config.params.account-prefix must be set and be a string value")
 	}
+	if accountPrefix == "-" {
+		return h.addRootAccountCredentials(request.Env, responseEnv)
+	}
+
 	session, err := h.GetRootAccountSession(request.Env)
 	if err != nil {
 		return err
