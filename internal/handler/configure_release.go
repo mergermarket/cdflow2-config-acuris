@@ -26,6 +26,8 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 
 	response.AdditionalMetadata["team"] = team
 
+	fmt.Fprintf(h.ErrorStream, "- Assuming \"%s-deploy\" role in \"acurisrelease\" account...\n", team)
+
 	if err := h.InitReleaseAccountCredentials(request.Env, team); err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
@@ -50,9 +52,11 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 
 		for _, need := range reqs.Needs {
 			if need == "lambda" {
+				fmt.Fprintf(h.ErrorStream, "- Setting Lambda build config...")
 				response.Env[buildID]["LAMBDA_BUCKET"] = LambdaBucket
 				setAWSEnvironmentVariables(response.Env[buildID], &releaseAccountCredentialsValue, Region)
 			} else if need == "ecr" {
+				fmt.Fprintf(h.ErrorStream, "- Setting ECR build config...")
 				ecrBuilds = append(ecrBuilds, buildID)
 				setAWSEnvironmentVariables(response.Env[buildID], &releaseAccountCredentialsValue, Region)
 			} else {
@@ -63,6 +67,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 		}
 	}
 	if len(ecrBuilds) != 0 {
+		fmt.Fprintf(h.ErrorStream, "- Checking ECR repository...")
 		sort.Strings(ecrBuilds)
 		if err := h.setupECR(request.Component, request.Version, team, response, session, ecrBuilds); err != nil {
 			fmt.Fprintln(h.ErrorStream, err)

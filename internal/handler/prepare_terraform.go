@@ -3,6 +3,8 @@ package handler
 import (
 	"fmt"
 	"io"
+	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/organizations"
@@ -49,9 +51,13 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 	}
 
 	s3Client := h.S3ClientFactory(session)
+
+	key := releaseS3Key(team, request.Component, request.Version)
+	fmt.Fprintf(h.ErrorStream, "- Downloading release from s3://%s/%s...\n", ReleaseBucket, key)
+
 	getObjectOutput, err := s3Client.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(ReleaseBucket),
-		Key:    aws.String(releaseS3Key(team, request.Component, request.Version)),
+		Key:    aws.String(key),
 	})
 	if err != nil {
 		response.Success = false
@@ -68,6 +74,18 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 	terraformImage, err := h.ReleaseLoader.Load(
 		getObjectOutput.Body, request.Component, request.Version, releaseDir,
 		func(path, checksum string) (io.ReadCloser, error) {
+			expectedPrefix := ".terraform/plugins/"
+			if !strings.HasPrefix(path, expectedPrefix) {
+				return nil, fmt.Errorf("expected path %q to start with %q", path, expectedPrefix)
+			}
+			name := path[len(expectedPrefix):]
+			reader, err := os.Open("/cache/terraform-plugin-cache/" + name)
+			if err == nil {
+				return reader, nil
+			} else if err != os.ErrNotExist {
+				return nil, err
+			}
+			fmt.Fprintf(h.ErrorStream, "- Downloading provider plugin %s...\n", name)
 			getObjectOutput, err := s3Client.GetObject(&s3.GetObjectInput{
 				Bucket: aws.String(ReleaseBucket),
 				Key:    aws.String(savedPluginKey(team, path, checksum)),
@@ -99,9 +117,9 @@ func (h *Handler) addRootAccountCredentials(requestEnv map[string]string, respon
 
 // AddDeployAccountCredentialsValue assumes a role in the right account and returns credentials.
 func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraformRequest, team string, responseEnv map[string]string) error {
-	accountPrefix, ok := request.Config["account-prefix"].(string)
+	accountPrefix, ok := request.Config["account_prefix"].(string)
 	if !ok || accountPrefix == "" {
-		return fmt.Errorf("cdflow.yaml: error - config.params.account-prefix must be set and be a string value")
+		return fmt.Errorf("cdflow.yaml: error - config.params.account_prefix must be set and be a string value")
 	}
 	if accountPrefix == "-" {
 		return h.addRootAccountCredentials(request.Env, responseEnv)

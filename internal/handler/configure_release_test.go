@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -341,7 +342,7 @@ func TestConfigureRelease(t *testing.T) {
 		if response.Success {
 			t.Fatal("unexpected success")
 		}
-		if errorBuffer.String() != "unable to satisfy \"unsupported\" need for \"something\" build" {
+		if !strings.Contains(errorBuffer.String(), "unable to satisfy \"unsupported\" need for \"something\" build") {
 			t.Fatalf("wrong error?: %q", errorBuffer.String())
 		}
 	})

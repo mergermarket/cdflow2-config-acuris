@@ -27,8 +27,6 @@ func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *
 		return fmt.Errorf("Unable to create AWS session in release account: %v", err)
 	}
 
-	fmt.Fprintf(h.ErrorStream, "Uploading release...\n")
-
 	s3Uploader := h.S3UploaderFactory(session)
 	s3Client := h.S3ClientFactory(session)
 	key := releaseS3Key(team, configureReleaseRequest.Component, configureReleaseRequest.Version)
@@ -53,7 +51,7 @@ func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *
 		return nil
 	}
 
-	fmt.Fprintf(h.ErrorStream, "Release uploaded to s3://%s/%s.\n", ReleaseBucket, key)
+	fmt.Fprintf(h.ErrorStream, "- Release uploaded to s3://%s/%s\n", ReleaseBucket, key)
 
 	return nil
 }
@@ -76,7 +74,7 @@ func (h *Handler) getSubResourceUploader(team string, s3Uploader s3manageriface.
 		} else {
 			return err
 		}
-		fmt.Fprintf(h.ErrorStream, "Saving provider plugin %s...\n", path)
+		fmt.Fprintf(h.ErrorStream, "- Saving provider plugin %s...\n", path)
 		if _, err := s3Uploader.Upload(&s3manager.UploadInput{
 			Bucket: bucket,
 			Key:    key,
@@ -84,7 +82,6 @@ func (h *Handler) getSubResourceUploader(team string, s3Uploader s3manageriface.
 		}); err != nil {
 			return err
 		}
-		fmt.Fprintf(h.ErrorStream, "Provider plugin %s saved.\n", path)
 		return nil
 	}
 }

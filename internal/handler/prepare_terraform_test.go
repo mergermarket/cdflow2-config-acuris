@@ -100,7 +100,7 @@ func TestPrepareTerraform(t *testing.T) {
 	component := "test-component"
 	request.Component = component
 	request.EnvName = "live"
-	request.Config["account-prefix"] = "foo"
+	request.Config["account_prefix"] = "foo"
 	response := common.CreatePrepareTerraformResponse()
 	terraformImage := "test-terraform-image"
 
@@ -240,7 +240,7 @@ func TestPrepareTerraformNoAccountPrefix(t *testing.T) {
 	request.Env["ROLE_SESSION_NAME"] = "baz"
 	request.Config["team"] = "test-team"
 	request.EnvName = "live"
-	request.Config["account-prefix"] = "-"
+	request.Config["account_prefix"] = "-"
 	response := common.CreatePrepareTerraformResponse()
 	terraformImage := "test-terraform-image"
 
