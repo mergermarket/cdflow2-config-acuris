@@ -173,7 +173,6 @@ func TestConfigureRelease(t *testing.T) {
 			t.Fatalf("expected %q, got %q", team, response.AdditionalMetadata["team"])
 		}
 	})
-
 	t.Run("ECR build", func(t *testing.T) {
 		// Given
 		request := createConfigureReleaseRequest()

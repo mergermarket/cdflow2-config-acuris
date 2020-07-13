@@ -71,7 +71,10 @@ type MockReleaseLoader struct {
 	releaseDir     string
 }
 
-func (m *MockReleaseLoader) Load(reader io.Reader, component, version, releaseDir string) (string, error) {
+func (m *MockReleaseLoader) Load(
+	reader io.Reader, component, version, releaseDir string,
+	pluginDownloader func(path, checksum string) (io.ReadCloser, error),
+) (string, error) {
 	if m.called {
 		log.Fatal("Load called twice")
 	}

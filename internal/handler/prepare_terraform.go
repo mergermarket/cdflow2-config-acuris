@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/organizations"
@@ -64,7 +65,19 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 		return nil
 	}
 
-	terraformImage, err := h.ReleaseLoader.Load(getObjectOutput.Body, request.Component, request.Version, releaseDir)
+	terraformImage, err := h.ReleaseLoader.Load(
+		getObjectOutput.Body, request.Component, request.Version, releaseDir,
+		func(path, checksum string) (io.ReadCloser, error) {
+			getObjectOutput, err := s3Client.GetObject(&s3.GetObjectInput{
+				Bucket: aws.String(ReleaseBucket),
+				Key:    aws.String(savedPluginKey(path, checksum)),
+			})
+			if err != nil {
+				return nil, err
+			}
+			return getObjectOutput.Body, nil
+		},
+	)
 	if err != nil {
 		return err
 	}

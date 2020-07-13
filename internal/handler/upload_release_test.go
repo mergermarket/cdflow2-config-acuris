@@ -35,7 +35,10 @@ type MockReleaseSaver struct {
 	reader         io.ReadCloser
 }
 
-func (m *MockReleaseSaver) Save(component, version, terraformImage, releaseDir string) (io.ReadCloser, error) {
+func (m *MockReleaseSaver) Save(
+	component, version, terraformImage, releaseDir string,
+	pluginSaver func(path, checksum string, reader io.ReadCloser) error,
+) (io.ReadCloser, error) {
 	if m.called {
 		log.Fatal("saver called twice")
 	}
