@@ -218,8 +218,8 @@ func releaseS3Key(team, component, version string) string {
 	return fmt.Sprintf("%s/%s/%s-%s.zip", team, component, component, version)
 }
 
-func savedPluginKey(path, checksum string) string {
-	return fmt.Sprintf("cdflow2-saved-plugins/%s/%s", path, checksum)
+func savedPluginKey(team, path, checksum string) string {
+	return fmt.Sprintf("%s/cdflow2-saved-plugins/%s/%s", team, path, checksum)
 }
 
 var sessionNameStripper *regexp.Regexp = regexp.MustCompile("[^\\w+=,.@-]")

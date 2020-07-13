@@ -24,8 +24,10 @@ func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *
 
 	session, err := h.createReleaseAccountSession()
 	if err != nil {
-		return fmt.Errorf("unable to create AWS session in release account: %v", err)
+		return fmt.Errorf("Unable to create AWS session in release account: %v", err)
 	}
+
+	fmt.Fprintf(h.ErrorStream, "Uploading release...\n")
 
 	s3Uploader := h.S3UploaderFactory(session)
 	s3Client := h.S3ClientFactory(session)
@@ -35,7 +37,7 @@ func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *
 		configureReleaseRequest.Version,
 		request.TerraformImage,
 		releaseDir,
-		h.getSubResourceUploader(s3Uploader, s3Client),
+		h.getSubResourceUploader(team, s3Uploader, s3Client),
 	)
 	if err != nil {
 		return err
@@ -46,7 +48,7 @@ func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *
 		Key:    aws.String(key),
 		Body:   releaseReader,
 	}); err != nil {
-		fmt.Fprintln(h.ErrorStream, "unable to upload release to S3:", err)
+		fmt.Fprintln(h.ErrorStream, "Unable to upload release to S3:", err)
 		response.Success = false
 		return nil
 	}
@@ -56,10 +58,10 @@ func (h *Handler) UploadRelease(request *common.UploadReleaseRequest, response *
 	return nil
 }
 
-func (h *Handler) getSubResourceUploader(s3Uploader s3manageriface.UploaderAPI, s3Client s3iface.S3API) func(string, string, io.ReadCloser) error {
+func (h *Handler) getSubResourceUploader(team string, s3Uploader s3manageriface.UploaderAPI, s3Client s3iface.S3API) func(string, string, io.ReadCloser) error {
 	return func(path, checksum string, reader io.ReadCloser) error {
 		bucket := aws.String(ReleaseBucket)
-		key := aws.String(savedPluginKey(path, checksum))
+		key := aws.String(savedPluginKey(team, path, checksum))
 		_, err := s3Client.HeadObject(&s3.HeadObjectInput{
 			Bucket: bucket,
 			Key:    key,
@@ -67,9 +69,14 @@ func (h *Handler) getSubResourceUploader(s3Uploader s3manageriface.UploaderAPI, 
 		if err == nil {
 			return nil
 		}
-		if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != s3.ErrCodeNoSuchKey {
+		if aerr, ok := err.(awserr.Error); ok {
+			if aerr.Code() != s3.ErrCodeNoSuchKey && aerr.Code() != "NotFound" {
+				return aerr
+			}
+		} else {
 			return err
 		}
+		fmt.Fprintf(h.ErrorStream, "Saving provider plugin %s...\n", path)
 		if _, err := s3Uploader.Upload(&s3manager.UploadInput{
 			Bucket: bucket,
 			Key:    key,
@@ -77,6 +84,7 @@ func (h *Handler) getSubResourceUploader(s3Uploader s3manageriface.UploaderAPI, 
 		}); err != nil {
 			return err
 		}
+		fmt.Fprintf(h.ErrorStream, "Provider plugin %s saved.\n", path)
 		return nil
 	}
 }
