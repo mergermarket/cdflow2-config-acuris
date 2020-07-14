@@ -65,6 +65,8 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 		return nil
 	}
 
+	fmt.Fprintf(h.ErrorStream, "- Assuming \"%s-deploy\" role in \"acurisrelease\" account...\n", team)
+
 	if err := h.AddDeployAccountCredentialsValue(request, team, response.Env); err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
@@ -125,19 +127,23 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 		return h.addRootAccountCredentials(request.Env, responseEnv)
 	}
 
-	session, err := h.GetRootAccountSession(request.Env)
-	if err != nil {
-		return err
-	}
-
-	orgsClient := h.OrganizationsClientFactory(session)
-
 	var accountName string
 	if request.EnvName == "live" {
 		accountName = accountPrefix + "prod"
 	} else {
 		accountName = accountPrefix + "dev"
 	}
+
+	role := team + "-deploy"
+
+	fmt.Fprintf(h.ErrorStream, "- Assuming %q role in %q account...\n", role, accountName)
+
+	session, err := h.GetRootAccountSession(request.Env)
+	if err != nil {
+		return err
+	}
+
+	orgsClient := h.OrganizationsClientFactory(session)
 
 	input := &organizations.ListAccountsInput{}
 	var accountID string
@@ -164,7 +170,7 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 
 	stsClient := h.STSClientFactory(session)
 	result, err := stsClient.AssumeRole(&sts.AssumeRoleInput{
-		RoleArn:         aws.String(fmt.Sprintf("arn:aws:iam::%s:role/%s-deploy", accountID, team)),
+		RoleArn:         aws.String(fmt.Sprintf("arn:aws:iam::%s:role/%s", accountID, role)),
 		RoleSessionName: aws.String(roleSessionName),
 	})
 	if err != nil {

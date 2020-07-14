@@ -60,6 +60,8 @@ func (h *Handler) GetRootAccountSession(env map[string]string) (*session.Session
 
 // InitReleaseAccountCredentials initialises the release account credentials.
 func (h *Handler) InitReleaseAccountCredentials(env map[string]string, team string) error {
+	fmt.Fprintf(h.ErrorStream, "- Assuming \"%s-deploy\" role in \"acurisrelease\" account...\n", team)
+
 	session, err := h.GetRootAccountSession(env)
 	if err != nil {
 		return err

@@ -7,7 +7,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/ecr"
 	"github.com/aws/aws-sdk-go/service/ecr/ecriface"
@@ -25,8 +24,6 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 	}
 
 	response.AdditionalMetadata["team"] = team
-
-	fmt.Fprintf(h.ErrorStream, "- Assuming \"%s-deploy\" role in \"acurisrelease\" account...\n", team)
 
 	if err := h.InitReleaseAccountCredentials(request.Env, team); err != nil {
 		response.Success = false
@@ -52,11 +49,9 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 
 		for _, need := range reqs.Needs {
 			if need == "lambda" {
-				fmt.Fprintf(h.ErrorStream, "- Setting Lambda build config...")
 				response.Env[buildID]["LAMBDA_BUCKET"] = LambdaBucket
 				setAWSEnvironmentVariables(response.Env[buildID], &releaseAccountCredentialsValue, Region)
 			} else if need == "ecr" {
-				fmt.Fprintf(h.ErrorStream, "- Setting ECR build config...")
 				ecrBuilds = append(ecrBuilds, buildID)
 				setAWSEnvironmentVariables(response.Env[buildID], &releaseAccountCredentialsValue, Region)
 			} else {
@@ -67,9 +62,9 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 		}
 	}
 	if len(ecrBuilds) != 0 {
-		fmt.Fprintf(h.ErrorStream, "- Checking ECR repository...")
 		sort.Strings(ecrBuilds)
-		if err := h.setupECR(request.Component, request.Version, team, response, session, ecrBuilds); err != nil {
+		ecrClient := h.ECRClientFactory(session)
+		if err := h.setupECR(request.Component, request.Version, team, response, ecrClient, ecrBuilds); err != nil {
 			fmt.Fprintln(h.ErrorStream, err)
 			response.Success = false
 			return nil
@@ -78,13 +73,19 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 	return nil
 }
 
-func (h *Handler) setupECR(component, version, team string, response *common.ConfigureReleaseResponse, session client.ConfigProvider, ecrBuilds []string) error {
-	ecrClient := h.ECRClientFactory(session)
+func (h *Handler) setupECR(component, version, team string, response *common.ConfigureReleaseResponse, ecrClient ecriface.ECRAPI, ecrBuilds []string) error {
+
 	repoName := team + "-" + component
+
+	fmt.Fprintf(h.ErrorStream, "- Checking ECR repository...\n")
+
 	repoURI, err := h.getECRRepo(repoName, ecrClient)
 	if err != nil {
 		return err
 	}
+
+	fmt.Fprintf(h.ErrorStream, "- Checking ECR lifecycle policy...\n")
+
 	if err := h.ensureECRRepoLifecycle(repoName, ecrBuilds, ecrClient); err != nil {
 		return err
 	}
@@ -92,6 +93,7 @@ func (h *Handler) setupECR(component, version, team string, response *common.Con
 		response.Env[buildID]["ECR_REPOSITORY"] = repoURI
 		response.Env[buildID]["ECR_TAG"] = buildID + "-" + version
 	}
+
 	return nil
 }
 
@@ -103,7 +105,7 @@ type ECRLifecyclePolicy struct {
 // ECRLifecyclePolicyRule represents a rule in a lifecycle policy in ECR.
 type ECRLifecyclePolicyRule struct {
 	RulePriority int                              `json:"rulePriority"`
-	Selection    *ECRLifecyclePolicyRuleSelection `json:"Selection"`
+	Selection    *ECRLifecyclePolicyRuleSelection `json:"selection"`
 	Action       *ECRLifecyclePolicyRuleAction    `json:"action"`
 }
 
@@ -121,6 +123,7 @@ type ECRLifecyclePolicyRuleAction struct {
 }
 
 func (h *Handler) ensureECRRepoLifecycle(repoName string, ecrBuilds []string, ecrClient ecriface.ECRAPI) error {
+	fmt.Fprintf(h.ErrorStream, "- Fetching lifecycle policy...\n")
 	output, err := ecrClient.GetLifecyclePolicy(&ecr.GetLifecyclePolicyInput{
 		RepositoryName: aws.String(repoName),
 	})
@@ -135,9 +138,9 @@ func (h *Handler) ensureECRRepoLifecycle(repoName string, ecrBuilds []string, ec
 	policy := &ECRLifecyclePolicy{}
 	for i, buildID := range ecrBuilds {
 		policy.Rules = append(policy.Rules, &ECRLifecyclePolicyRule{
-			RulePriority: i,
+			RulePriority: i + 1,
 			Selection: &ECRLifecyclePolicyRuleSelection{
-				TagStatus:     ecr.TagStatusTagged,
+				TagStatus:     "tagged",
 				TagPrefixList: []string{buildID + "-"},
 				CountType:     "imageCountMoreThan",
 				CountNumber:   50,
@@ -154,8 +157,10 @@ func (h *Handler) ensureECRRepoLifecycle(repoName string, ecrBuilds []string, ec
 	if string(serialisedPolicy) == existingPolicyText {
 		return nil
 	}
+	fmt.Fprintf(h.ErrorStream, "- Updating lifecycle policy...\n")
 	if _, err := ecrClient.PutLifecyclePolicy(&ecr.PutLifecyclePolicyInput{
 		RepositoryName:      aws.String(repoName),
+		RegistryId:          aws.String(AccountID),
 		LifecyclePolicyText: aws.String(string(serialisedPolicy)),
 	}); err != nil {
 		return err
@@ -167,7 +172,9 @@ func setAWSEnvironmentVariables(env map[string]string, creds *credentials.Value,
 	env["AWS_ACCESS_KEY_ID"] = creds.AccessKeyID
 	env["AWS_SECRET_ACCESS_KEY"] = creds.SecretAccessKey
 	env["AWS_SESSION_TOKEN"] = creds.SessionToken
-	env["AWS_DEFAULT_REGION"] = region
+	// depending on the SDK one of these will be used
+	env["AWS_REGION"] = region         // java & go
+	env["AWS_DEFAULT_REGION"] = region // python, node, etc.
 }
 
 func (h *Handler) getECRRepo(repoName string, ecrClient ecriface.ECRAPI) (string, error) {
