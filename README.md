@@ -2,6 +2,9 @@
 
 This container is for teams using cdflow2 to deploy services within Acuris - i.e. Acuris staff members and partners building services for Acuris infrastructure. If this doesn't appy to you, consult the [cdflow2 documentation](https://developer-preview.acuris.com/opensource/cdflow2/) to see if there is a config container that will work for your use-case (or how to build one).
 
+* [mergermarket/cdflow2-config-acuris on DockerHub](https://hub.docker.com/r/mergermarket/cdflow2-config-acuris)
+* [mergermarket/cdflow2-config-acuris on GitHub](https://github.com/mergermarket/cdflow2-config-acuris)
+
 ## Usage
 
 `cdflow.yaml`:
