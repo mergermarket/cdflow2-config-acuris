@@ -50,6 +50,16 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 		return fmt.Errorf("unable to create AWS session in release account: %v", err)
 	}
 
+	if err := h.AddDeployAccountCredentialsValue(request, team, response.Env); err != nil {
+		response.Success = false
+		fmt.Fprintln(h.ErrorStream, err)
+		return nil
+	}
+
+	if request.Version == "" {
+		return nil
+	}
+
 	s3Client := h.S3ClientFactory(session)
 
 	key := releaseS3Key(team, request.Component, request.Version)
@@ -60,14 +70,6 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		response.Success = false
-		fmt.Fprintln(h.ErrorStream, err)
-		return nil
-	}
-
-	fmt.Fprintf(h.ErrorStream, "- Assuming \"%s-deploy\" role in \"acurisrelease\" account...\n", team)
-
-	if err := h.AddDeployAccountCredentialsValue(request, team, response.Env); err != nil {
 		response.Success = false
 		fmt.Fprintln(h.ErrorStream, err)
 		return nil
