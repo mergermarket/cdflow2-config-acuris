@@ -13,6 +13,28 @@ import (
 	common "github.com/mergermarket/cdflow2-config-common"
 )
 
+const ECR_REPO_POLICY = `
+{
+	"Version": "2008-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Principal": "*",
+			"Action": [
+				"ecr:BatchCheckLayerAvailability",
+				"ecr:BatchGetImage",
+				"ecr:GetDownloadUrlForLayer"
+			],
+			"Condition": {
+				"StringEquals": {
+					"aws:PrincipalOrgID": "o-qisv7rs9ed"
+				}
+			}
+		}
+	]
+}
+`
+
 // ConfigureRelease runs before release to configure it.
 func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, response *common.ConfigureReleaseResponse) error {
 
@@ -81,6 +103,12 @@ func (h *Handler) setupECR(component, version, team string, response *common.Con
 
 	repoURI, err := h.getECRRepo(repoName, ecrClient)
 	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(h.ErrorStream, "- Checking ECR repository policy...\n")
+
+	if err := h.ensureRepoPolicy(repoName, ecrClient); err != nil {
 		return err
 	}
 
@@ -206,6 +234,30 @@ func (h *Handler) getECRRepo(repoName string, ecrClient ecriface.ECRAPI) (string
 		}
 	}
 	return *response.Repositories[0].RepositoryUri, nil
+}
+
+func (h *Handler) ensureRepoPolicy(repoName string, ecrClient ecriface.ECRAPI) error {
+	response, err := ecrClient.GetRepositoryPolicy(
+		&ecr.GetRepositoryPolicyInput{RepositoryName: aws.String(repoName)})
+
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); !ok || ok && aerr.Code() != ecr.ErrCodeRepositoryPolicyNotFoundException {
+			return err
+		}
+	} else {
+		if *response.PolicyText == ECR_REPO_POLICY {
+			return nil
+		}
+	}
+
+	if _, err := ecrClient.SetRepositoryPolicy(&ecr.SetRepositoryPolicyInput{
+		PolicyText:     aws.String(ECR_REPO_POLICY),
+		RepositoryName: aws.String(repoName),
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (h *Handler) createECRRepo(name string, ecrClient ecriface.ECRAPI) (string, error) {

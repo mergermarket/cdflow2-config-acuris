@@ -40,6 +40,27 @@ func (m *MockECRClient) DescribeRepositories(input *ecr.DescribeRepositoriesInpu
 }
 
 const expectedPolicyDocument = "{\"rules\":[{\"rulePriority\":1,\"selection\":{\"tagStatus\":\"tagged\",\"tagPrefixList\":[\"my-ecr-\"],\"countType\":\"imageCountMoreThan\",\"countNumber\":50},\"action\":{\"type\":\"expire\"}}]}"
+const expectedRepoPolicyDocument = `
+{
+	"Version": "2008-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Principal": "*",
+			"Action": [
+				"ecr:BatchCheckLayerAvailability",
+				"ecr:BatchGetImage",
+				"ecr:GetDownloadUrlForLayer"
+			],
+			"Condition": {
+				"StringEquals": {
+					"aws:PrincipalOrgID": "o-qisv7rs9ed"
+				}
+			}
+		}
+	]
+}
+`
 
 func (*MockECRClient) GetLifecyclePolicy(input *ecr.GetLifecyclePolicyInput) (*ecr.GetLifecyclePolicyOutput, error) {
 	return &ecr.GetLifecyclePolicyOutput{
@@ -71,11 +92,22 @@ func (m *MockECRClient) PutImageScanningConfiguration(input *ecr.PutImageScannin
 	return &ecr.PutImageScanningConfigurationOutput{}, nil
 }
 
+func (m *MockECRClient) GetRepositoryPolicy(input *ecr.GetRepositoryPolicyInput) (*ecr.GetRepositoryPolicyOutput, error) {
+	return &ecr.GetRepositoryPolicyOutput{
+		PolicyText: aws.String(expectedRepoPolicyDocument),
+	}, nil
+}
+
+func (m *MockECRClient) SetRepositoryPolicy(input *ecr.SetRepositoryPolicyInput) (*ecr.SetRepositoryPolicyOutput, error) {
+	return &ecr.SetRepositoryPolicyOutput{}, nil
+}
+
 type MockECRClientNoRepo struct {
 	ecriface.ECRAPI
-	CreateRepositoryInput   *ecr.CreateRepositoryInput
-	PutLifecyclePolicyInput *ecr.PutLifecyclePolicyInput
-	repositoryName          string
+	CreateRepositoryInput    *ecr.CreateRepositoryInput
+	PutLifecyclePolicyInput  *ecr.PutLifecyclePolicyInput
+	GetRepositoryPolicyInput *ecr.GetRepositoryPolicyInput
+	repositoryName           string
 }
 
 func (m *MockECRClientNoRepo) DescribeRepositories(input *ecr.DescribeRepositoriesInput) (*ecr.DescribeRepositoriesOutput, error) {
@@ -108,6 +140,15 @@ func (m *MockECRClientNoRepo) PutLifecyclePolicy(input *ecr.PutLifecyclePolicyIn
 	}
 	m.PutLifecyclePolicyInput = input
 	return &ecr.PutLifecyclePolicyOutput{}, nil
+}
+func (m *MockECRClientNoRepo) GetRepositoryPolicy(input *ecr.GetRepositoryPolicyInput) (*ecr.GetRepositoryPolicyOutput, error) {
+	return nil, awserr.New(ecr.ErrCodeRepositoryPolicyNotFoundException, "", nil)
+}
+
+func (m *MockECRClientNoRepo) SetRepositoryPolicy(input *ecr.SetRepositoryPolicyInput) (*ecr.SetRepositoryPolicyOutput, error) {
+	return &ecr.SetRepositoryPolicyOutput{
+		PolicyText: aws.String(expectedRepoPolicyDocument),
+	}, nil
 }
 
 func createConfigureReleaseRequest() *common.ConfigureReleaseRequest {
@@ -346,4 +387,50 @@ func TestConfigureRelease(t *testing.T) {
 			t.Fatalf("wrong error?: %q", errorBuffer.String())
 		}
 	})
+
+	t.Run("ECR build no Repo Policy", func(t *testing.T) {
+		// Given
+		request := createConfigureReleaseRequest()
+		request.Component = "my-component"
+		team := "my-team"
+		request.Config["team"] = team
+		request.ReleaseRequirements = map[string]*common.ReleaseRequirements{
+			"my-ecr": {Needs: []string{"ecr"}},
+			"my-x":   {},
+		}
+		response := common.CreateConfigureReleaseResponse()
+
+		ecrClient := &MockECRClient{
+			DefaultMutability: "IMMUTABLE",
+			DefaultScanOnPush: true,
+		}
+		h := handler.New().
+			WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
+			WithECRClientFactory(func(session client.ConfigProvider) ecriface.ECRAPI {
+				return ecrClient
+			})
+
+		// When
+		h.ConfigureRelease(request, response)
+
+		// Then
+		if !response.Success {
+			t.Fatal("unexpected failure")
+		}
+		if len(response.Env) != 2 {
+			t.Fatalf("Expected 2 builds, got %d", len(response.Env))
+		}
+		ecrRepository := response.Env["my-ecr"]["ECR_REPOSITORY"]
+		expectedRepository := "repo:" + team + "-" + request.Component
+		if ecrRepository != expectedRepository {
+			t.Fatalf("got %q, want %q", ecrRepository, expectedRepository)
+		}
+		for name, value := range expectedEnvVars {
+			if response.Env["my-ecr"][name] != value {
+				t.Fatalf("got %q for %q, expected %q", response.Env["my-ecr"][name], name, value)
+			}
+		}
+
+	})
+
 }
