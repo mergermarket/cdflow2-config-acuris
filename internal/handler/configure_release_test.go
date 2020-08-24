@@ -21,6 +21,8 @@ type MockECRClient struct {
 	PutLifecyclePolicyInput            *ecr.PutLifecyclePolicyInput
 	PutImageScanningConfigurationInput *ecr.PutImageScanningConfigurationInput
 	PutImageTagMutabilityInput         *ecr.PutImageTagMutabilityInput
+	GetRepositoryPolicyInput           *ecr.GetRepositoryPolicyInput
+	SetRepositoryPolicyInput           *ecr.SetRepositoryPolicyInput
 	DefaultMutability                  string
 	DefaultScanOnPush                  bool
 }
@@ -93,12 +95,17 @@ func (m *MockECRClient) PutImageScanningConfiguration(input *ecr.PutImageScannin
 }
 
 func (m *MockECRClient) GetRepositoryPolicy(input *ecr.GetRepositoryPolicyInput) (*ecr.GetRepositoryPolicyOutput, error) {
+	m.GetRepositoryPolicyInput = input
 	return &ecr.GetRepositoryPolicyOutput{
 		PolicyText: aws.String(expectedRepoPolicyDocument),
 	}, nil
 }
 
 func (m *MockECRClient) SetRepositoryPolicy(input *ecr.SetRepositoryPolicyInput) (*ecr.SetRepositoryPolicyOutput, error) {
+	if m.SetRepositoryPolicyInput != nil {
+		panic("SetRepositoryPolicyInput already called")
+	}
+	m.SetRepositoryPolicyInput = input
 	return &ecr.SetRepositoryPolicyOutput{}, nil
 }
 
@@ -107,6 +114,7 @@ type MockECRClientNoRepo struct {
 	CreateRepositoryInput    *ecr.CreateRepositoryInput
 	PutLifecyclePolicyInput  *ecr.PutLifecyclePolicyInput
 	GetRepositoryPolicyInput *ecr.GetRepositoryPolicyInput
+	SetRepositoryPolicyInput *ecr.SetRepositoryPolicyInput
 	repositoryName           string
 }
 
@@ -142,10 +150,15 @@ func (m *MockECRClientNoRepo) PutLifecyclePolicy(input *ecr.PutLifecyclePolicyIn
 	return &ecr.PutLifecyclePolicyOutput{}, nil
 }
 func (m *MockECRClientNoRepo) GetRepositoryPolicy(input *ecr.GetRepositoryPolicyInput) (*ecr.GetRepositoryPolicyOutput, error) {
+	m.GetRepositoryPolicyInput = input
 	return nil, awserr.New(ecr.ErrCodeRepositoryPolicyNotFoundException, "", nil)
 }
 
 func (m *MockECRClientNoRepo) SetRepositoryPolicy(input *ecr.SetRepositoryPolicyInput) (*ecr.SetRepositoryPolicyOutput, error) {
+	if m.SetRepositoryPolicyInput != nil {
+		panic("SetRepositoryPolicy already called")
+	}
+	m.SetRepositoryPolicyInput = input
 	return &ecr.SetRepositoryPolicyOutput{
 		PolicyText: aws.String(expectedRepoPolicyDocument),
 	}, nil
@@ -400,14 +413,11 @@ func TestConfigureRelease(t *testing.T) {
 		}
 		response := common.CreateConfigureReleaseResponse()
 
-		ecrClient := &MockECRClient{
-			DefaultMutability: "IMMUTABLE",
-			DefaultScanOnPush: true,
-		}
+		var ecrClient MockECRClientNoRepo
 		h := handler.New().
 			WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
 			WithECRClientFactory(func(session client.ConfigProvider) ecriface.ECRAPI {
-				return ecrClient
+				return &ecrClient
 			})
 
 		// When
@@ -417,18 +427,17 @@ func TestConfigureRelease(t *testing.T) {
 		if !response.Success {
 			t.Fatal("unexpected failure")
 		}
-		if len(response.Env) != 2 {
-			t.Fatalf("Expected 2 builds, got %d", len(response.Env))
+
+		if ecrClient.GetRepositoryPolicyInput == nil {
+			t.Fatal("Ensure ecr was not called")
 		}
-		ecrRepository := response.Env["my-ecr"]["ECR_REPOSITORY"]
-		expectedRepository := "repo:" + team + "-" + request.Component
-		if ecrRepository != expectedRepository {
-			t.Fatalf("got %q, want %q", ecrRepository, expectedRepository)
+
+		if ecrClient.SetRepositoryPolicyInput == nil {
+			t.Fatal("Did not set the policy")
 		}
-		for name, value := range expectedEnvVars {
-			if response.Env["my-ecr"][name] != value {
-				t.Fatalf("got %q for %q, expected %q", response.Env["my-ecr"][name], name, value)
-			}
+
+		if ecrClient.SetRepositoryPolicyInput.PolicyText == nil {
+			t.Fatal("Did not set the policy text correctly")
 		}
 
 	})
