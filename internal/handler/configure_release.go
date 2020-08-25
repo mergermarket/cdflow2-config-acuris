@@ -237,6 +237,7 @@ func (h *Handler) getECRRepo(repoName string, ecrClient ecriface.ECRAPI) (string
 }
 
 func (h *Handler) ensureRepoPolicy(repoName string, ecrClient ecriface.ECRAPI) error {
+	fmt.Fprintf(h.ErrorStream, "- Fetching repository policy...\n")
 	response, err := ecrClient.GetRepositoryPolicy(
 		&ecr.GetRepositoryPolicyInput{RepositoryName: aws.String(repoName)})
 
@@ -249,7 +250,7 @@ func (h *Handler) ensureRepoPolicy(repoName string, ecrClient ecriface.ECRAPI) e
 			return nil
 		}
 	}
-
+	fmt.Fprintf(h.ErrorStream, "- Updating repository policy...\n")
 	if _, err := ecrClient.SetRepositoryPolicy(&ecr.SetRepositoryPolicyInput{
 		PolicyText:     aws.String(ECR_REPO_POLICY),
 		RepositoryName: aws.String(repoName),
