@@ -44,6 +44,8 @@ github.com/mergermarket/cdflow2-config-common v0.43.4 h1:s7SIAgUyVjRv7utV1ItSrEs
 github.com/mergermarket/cdflow2-config-common v0.43.4/go.mod h1:cfGbpAf6V/nPerWwJeqEfg1G0ItuitCgHDflkROJsx8=
 github.com/mergermarket/cdflow2-config-common v0.43.5 h1:vkx29zYiXQJvy8ZlRXJdH75qFueEHigqm+opsSoFVpo=
 github.com/mergermarket/cdflow2-config-common v0.43.5/go.mod h1:cfGbpAf6V/nPerWwJeqEfg1G0ItuitCgHDflkROJsx8=
+github.com/mergermarket/cdflow2-config-common v0.43.6 h1:2UC6GPjgF1tz3ehuDs7ekAw/e2Fa5br9QL5zE6266g0=
+github.com/mergermarket/cdflow2-config-common v0.43.6/go.mod h1:cfGbpAf6V/nPerWwJeqEfg1G0ItuitCgHDflkROJsx8=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=

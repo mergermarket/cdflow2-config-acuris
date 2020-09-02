@@ -86,7 +86,7 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 			reader, err := os.Open("/cache/terraform-plugin-cache/" + name)
 			if err == nil {
 				return reader, nil
-			} else if err != os.ErrNotExist {
+			} else if !os.IsNotExist(err) {
 				return nil, err
 			}
 			fmt.Fprintf(h.ErrorStream, "- Downloading provider plugin %s...\n", name)
