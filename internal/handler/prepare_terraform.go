@@ -56,6 +56,8 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 		return nil
 	}
 
+	AddAdditionalEnvironment(request.Env, response.Env)
+
 	if request.Version == "" {
 		return nil
 	}
@@ -185,4 +187,12 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 	responseEnv["AWS_DEFAULT_REGION"] = Region
 
 	return nil
+}
+
+// AddAdditionalEnvironment variables sends in env variables
+func AddAdditionalEnvironment(requestEnv map[string]string, responseEnv map[string]string) {
+	responseEnv["DD_APP_KEY"] = requestEnv["DATADOG_APP_KEY"]
+	responseEnv["DD_API_KEY"] = requestEnv["DATADOG_API_KEY"]
+	responseEnv["FASTLY_API_KEY"] = requestEnv["FASTLY_API_KEY"]
+	responseEnv["GITHUB_TOKEN"] = requestEnv["GITHUB_TOKEN"]
 }
