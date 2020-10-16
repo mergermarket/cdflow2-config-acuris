@@ -72,6 +72,9 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 		for _, need := range reqs.Needs {
 			if need == "lambda" {
 				response.Env[buildID]["LAMBDA_BUCKET"] = LambdaBucket
+				response.Env[buildID]["LAMBDA_PATH"] = fmt.Sprintf(
+					"%s/%s/%s/%s", team, request.Component, request.Version, buildID,
+				)
 				setAWSEnvironmentVariables(response.Env[buildID], &releaseAccountCredentialsValue, Region)
 			} else if need == "ecr" {
 				ecrBuilds = append(ecrBuilds, buildID)
