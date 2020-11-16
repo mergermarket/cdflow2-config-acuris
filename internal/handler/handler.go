@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
@@ -148,7 +149,7 @@ func New() *Handler {
 				Client:          sts.New(session),
 				RoleARN:         roleARN,
 				RoleSessionName: roleSessionName,
-				Duration:        stscreds.DefaultDuration,
+				Duration:        time.Duration(60) * time.Minute,
 			}
 		},
 		ReleaseLoader: common.CreateReleaseLoader(),
