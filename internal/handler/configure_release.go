@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -79,6 +80,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 			} else if need == "ecr" {
 				ecrBuilds = append(ecrBuilds, buildID)
 				setAWSEnvironmentVariables(response.Env[buildID], &releaseAccountCredentialsValue, Region)
+				setCdflowDockerAuthVariables(response.Env[buildID], request.Env)
 			} else {
 				fmt.Fprintf(h.ErrorStream, "unable to satisfy %q need for %q build", need, buildID)
 				response.Success = false
@@ -206,6 +208,14 @@ func setAWSEnvironmentVariables(env map[string]string, creds *credentials.Value,
 	// depending on the SDK one of these will be used
 	env["AWS_REGION"] = region         // java & go
 	env["AWS_DEFAULT_REGION"] = region // python, node, etc.
+}
+
+func setCdflowDockerAuthVariables(respEnv map[string]string, reqEnv map[string]string) {
+	for key, element := range reqEnv {
+		if strings.HasPrefix(key, "CDFLOW2_DOCKER_AUTH_") {
+			respEnv[key] = element
+		}
+	}
 }
 
 func (h *Handler) getECRRepo(repoName string, ecrClient ecriface.ECRAPI) (string, error) {
