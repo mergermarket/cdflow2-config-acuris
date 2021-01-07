@@ -299,8 +299,7 @@ func TestPrepareTerraformNoAccountPrefix(t *testing.T) {
 	}
 }
 
-
-func TestPrepareTerraformWithoutAdditionalLiveEnvs(t *testing.T) {
+func TestPrepareTerraformWithoutAdditionalProdEnvs(t *testing.T) {
 	// Given
 
 	request := common.CreatePrepareTerraformRequest()
@@ -369,10 +368,7 @@ func TestPrepareTerraformWithoutAdditionalLiveEnvs(t *testing.T) {
 	}
 }
 
-
-
-
-func TestPrepareTerraformWithAdditionalLiveEnvs(t *testing.T) {
+func TestPrepareTerraformWithAdditionalProdEnvs(t *testing.T) {
 	// Given
 
 	request := common.CreatePrepareTerraformRequest()

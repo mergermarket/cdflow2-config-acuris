@@ -121,15 +121,15 @@ func (h *Handler) addRootAccountCredentials(requestEnv map[string]string, respon
 	return nil
 }
 
-// Contains takes a slice and looks for an element in it. If found it will
+// Contains takes a slice and looks for val as an element in it. If found it will
 // return true, otherwise it will return a false.
-func contains(val string, slice []string) (bool) {
-    for _, item := range slice {
-        if item == val {
-            return true
-        }
-    }
-    return false
+func contains(val string, slice []string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
 }
 
 // AddDeployAccountCredentialsValue assumes a role in the right account and returns credentials.
@@ -142,15 +142,20 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 		return h.addRootAccountCredentials(request.Env, responseEnv)
 	}
 
-	// additionalLiveEnvs, ok := request.Config["additional_live_envs"]
+	prodEnvs := []string{"live"}
+	additionalProdEnvsInterface, ok := request.Config["additional_prod_envs"].([]interface{})
+	if ok {
+		prodEnvs = make([]string, len(additionalProdEnvsInterface)+1)
+		prodEnvs[0] = "live"
+		for i, v := range additionalProdEnvsInterface {
+			prodEnvs[i+1] = v.(string)
+		}
 
-	// if !ok {
-	// 	fmt.Fprintf(h.ErrorStream,"cdflow.yaml: config.params.additional_live_envs not set so default to empty\n")
-	// 	additionalLiveEnvs = []string{}
-	// }
+		fmt.Fprintf(h.ErrorStream, "Found additional_prod_envs, appending them to the default resulting in: %v\n", prodEnvs)
+	}
 
 	var accountName string
-	if request.EnvName == "live"  {
+	if contains(request.EnvName, prodEnvs) {
 		accountName = accountPrefix + "prod"
 	} else {
 		accountName = accountPrefix + "dev"
