@@ -298,3 +298,146 @@ func TestPrepareTerraformNoAccountPrefix(t *testing.T) {
 		t.Fatalf("Want %q, got %q", handler.Region, response.Env["AWS_DEFAULT_REGION"])
 	}
 }
+
+
+func TestPrepareTerraformWithoutAdditionalLiveEnvs(t *testing.T) {
+	// Given
+
+	request := common.CreatePrepareTerraformRequest()
+	request.Version = "test-version"
+	request.Env["AWS_ACCESS_KEY_ID"] = "root foo"
+	request.Env["AWS_SECRET_ACCESS_KEY"] = "root bar"
+	request.Env["ROLE_SESSION_NAME"] = "baz"
+	request.Config["team"] = "test-team"
+	request.EnvName = "live"
+	request.Config["account_prefix"] = "-"
+	response := common.CreatePrepareTerraformResponse()
+	terraformImage := "test-terraform-image"
+
+	accessKeyID := "foo"
+	secretAccessKey := "bar"
+	sessionToken := "baz"
+
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove(file.Name())
+
+	mockS3Client := &MockS3Client{
+		getObjectBody: file,
+	}
+	mockAssumeRoleProviderFactory := func(session client.ConfigProvider, roleARN, roleSessionName string) credentials.Provider {
+		return createMockAssumeRoleProvider(accessKeyID, secretAccessKey, sessionToken)
+	}
+
+	releaseDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(releaseDir)
+
+	loader := MockReleaseLoader{terraformImage: terraformImage}
+
+	h := handler.New().
+		WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
+		WithS3ClientFactory(func(client.ConfigProvider) s3iface.S3API {
+			return mockS3Client
+		}).
+		//WithSTSClientFactory(func(client.ConfigProvider) stsiface.STSAPI {
+		//	return mockSTSClient
+		//}).
+		WithReleaseLoader(&loader)
+
+	// When
+	if err := h.PrepareTerraform(request, response, releaseDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// Then
+	if response.Env["AWS_ACCESS_KEY_ID"] != request.Env["AWS_ACCESS_KEY_ID"] {
+		t.Fatalf("Want %q, got %q", request.Env["AWS_ACCESS_KEY_ID"], response.Env["AWS_ACCESS_KEY_ID"])
+	}
+	if response.Env["AWS_SECRET_ACCESS_KEY"] != request.Env["AWS_SECRET_ACCESS_KEY"] {
+		t.Fatalf("Want %q, got %q", request.Env["AWS_SECRET_ACCESS_KEY"], response.Env["AWS_SECRET_ACCESS_KEY"])
+	}
+	if response.Env["AWS_SESSION_TOKEN"] != request.Env["AWS_SESSION_TOKEN"] {
+		t.Fatalf("Want %q, got %q", request.Env["AWS_SESSION_TOKEN"], response.Env["AWS_SESSION_TOKEN"])
+	}
+	if response.Env["AWS_DEFAULT_REGION"] != handler.Region {
+		t.Fatalf("Want %q, got %q", handler.Region, response.Env["AWS_DEFAULT_REGION"])
+	}
+}
+
+
+
+
+func TestPrepareTerraformWithAdditionalLiveEnvs(t *testing.T) {
+	// Given
+
+	request := common.CreatePrepareTerraformRequest()
+	request.Version = "test-version"
+	request.Env["AWS_ACCESS_KEY_ID"] = "root foo"
+	request.Env["AWS_SECRET_ACCESS_KEY"] = "root bar"
+	request.Env["ROLE_SESSION_NAME"] = "baz"
+	request.Config["team"] = "test-team"
+	request.Config["additional_live_envs"] = []string{"foo", "bar"}
+	request.EnvName = "foo"
+	request.Config["account_prefix"] = "-"
+	response := common.CreatePrepareTerraformResponse()
+	terraformImage := "test-terraform-image"
+
+	accessKeyID := "foo"
+	secretAccessKey := "bar"
+	sessionToken := "baz"
+
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove(file.Name())
+
+	mockS3Client := &MockS3Client{
+		getObjectBody: file,
+	}
+	mockAssumeRoleProviderFactory := func(session client.ConfigProvider, roleARN, roleSessionName string) credentials.Provider {
+		return createMockAssumeRoleProvider(accessKeyID, secretAccessKey, sessionToken)
+	}
+
+	releaseDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(releaseDir)
+
+	loader := MockReleaseLoader{terraformImage: terraformImage}
+
+	h := handler.New().
+		WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
+		WithS3ClientFactory(func(client.ConfigProvider) s3iface.S3API {
+			return mockS3Client
+		}).
+		//WithSTSClientFactory(func(client.ConfigProvider) stsiface.STSAPI {
+		//	return mockSTSClient
+		//}).
+		WithReleaseLoader(&loader)
+
+	// When
+	if err := h.PrepareTerraform(request, response, releaseDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// Then
+	if response.Env["AWS_ACCESS_KEY_ID"] != request.Env["AWS_ACCESS_KEY_ID"] {
+		t.Fatalf("Want %q, got %q", request.Env["AWS_ACCESS_KEY_ID"], response.Env["AWS_ACCESS_KEY_ID"])
+	}
+	if response.Env["AWS_SECRET_ACCESS_KEY"] != request.Env["AWS_SECRET_ACCESS_KEY"] {
+		t.Fatalf("Want %q, got %q", request.Env["AWS_SECRET_ACCESS_KEY"], response.Env["AWS_SECRET_ACCESS_KEY"])
+	}
+	if response.Env["AWS_SESSION_TOKEN"] != request.Env["AWS_SESSION_TOKEN"] {
+		t.Fatalf("Want %q, got %q", request.Env["AWS_SESSION_TOKEN"], response.Env["AWS_SESSION_TOKEN"])
+	}
+	if response.Env["AWS_DEFAULT_REGION"] != handler.Region {
+		t.Fatalf("Want %q, got %q", handler.Region, response.Env["AWS_DEFAULT_REGION"])
+	}
+}

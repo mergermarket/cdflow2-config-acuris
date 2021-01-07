@@ -121,6 +121,17 @@ func (h *Handler) addRootAccountCredentials(requestEnv map[string]string, respon
 	return nil
 }
 
+// Contains takes a slice and looks for an element in it. If found it will
+// return true, otherwise it will return a false.
+func contains(val string, slice []string) (bool) {
+    for _, item := range slice {
+        if item == val {
+            return true
+        }
+    }
+    return false
+}
+
 // AddDeployAccountCredentialsValue assumes a role in the right account and returns credentials.
 func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraformRequest, team string, responseEnv map[string]string) error {
 	accountPrefix, ok := request.Config["account_prefix"].(string)
@@ -132,10 +143,15 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 	}
 
 	additionalLiveEnvs, ok := request.Config["additional_live_envs"]
-	fmt.Fprintf(h.ErrorStream, "Got %v", additionalLiveEnvs)
+
+	if !ok {
+		fmt.Fprintf(h.ErrorStream,"cdflow.yaml: config.params.additional_live_envs not set so default to empty\n")
+		additionalLiveEnvs = []string{}
+	}
 
 	var accountName string
-	if request.EnvName == "live" {
+	if request.EnvName == "live" ||
+	   contains(request.EnvName, additionalLiveEnvs.([]string)) {
 		accountName = accountPrefix + "prod"
 	} else {
 		accountName = accountPrefix + "dev"
