@@ -131,6 +131,9 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 		return h.addRootAccountCredentials(request.Env, responseEnv)
 	}
 
+	additionalLiveEnvs, ok := request.Config["additional_live_envs"]
+	fmt.Fprintf(h.ErrorStream, "Got %v", additionalLiveEnvs)
+
 	var accountName string
 	if request.EnvName == "live" {
 		accountName = accountPrefix + "prod"
