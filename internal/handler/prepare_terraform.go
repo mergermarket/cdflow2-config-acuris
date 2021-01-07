@@ -142,16 +142,15 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 		return h.addRootAccountCredentials(request.Env, responseEnv)
 	}
 
-	additionalLiveEnvs, ok := request.Config["additional_live_envs"]
+	// additionalLiveEnvs, ok := request.Config["additional_live_envs"]
 
-	if !ok {
-		fmt.Fprintf(h.ErrorStream,"cdflow.yaml: config.params.additional_live_envs not set so default to empty\n")
-		additionalLiveEnvs = []string{}
-	}
+	// if !ok {
+	// 	fmt.Fprintf(h.ErrorStream,"cdflow.yaml: config.params.additional_live_envs not set so default to empty\n")
+	// 	additionalLiveEnvs = []string{}
+	// }
 
 	var accountName string
-	if request.EnvName == "live" ||
-	   contains(request.EnvName, additionalLiveEnvs.([]string)) {
+	if request.EnvName == "live"  {
 		accountName = accountPrefix + "prod"
 	} else {
 		accountName = accountPrefix + "dev"
