@@ -377,7 +377,7 @@ func TestPrepareTerraformWithAdditionalProdEnvs(t *testing.T) {
 	request.Env["AWS_SECRET_ACCESS_KEY"] = "root bar"
 	request.Env["ROLE_SESSION_NAME"] = "baz"
 	request.Config["team"] = "test-team"
-	request.Config["additional_live_envs"] = []string{"foo", "bar"}
+	request.Config["additional_prod_envs"] = []string{"foo", "bar"}
 	request.EnvName = "foo"
 	request.Config["account_prefix"] = "-"
 	response := common.CreatePrepareTerraformResponse()
