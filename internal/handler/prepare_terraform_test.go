@@ -240,7 +240,7 @@ func TestPrepareTerraformNoAccountPrefix(t *testing.T) {
 	request.Env["ROLE_SESSION_NAME"] = "baz"
 	request.Config["team"] = "test-team"
 	request.EnvName = "live"
-	request.Config["account_prefix"] = "-"
+	request.Config["account_prefix"] = "root"
 	response := common.CreatePrepareTerraformResponse()
 	terraformImage := "test-terraform-image"
 
@@ -309,7 +309,7 @@ func TestPrepareTerraformWithoutAdditionalProdEnvs(t *testing.T) {
 	request.Env["ROLE_SESSION_NAME"] = "baz"
 	request.Config["team"] = "test-team"
 	request.EnvName = "live"
-	request.Config["account_prefix"] = "-"
+	request.Config["account_prefix"] = "root"
 	response := common.CreatePrepareTerraformResponse()
 	terraformImage := "test-terraform-image"
 
@@ -379,7 +379,7 @@ func TestPrepareTerraformWithAdditionalProdEnvs(t *testing.T) {
 	request.Config["team"] = "test-team"
 	request.Config["additional_prod_envs"] = []string{"foo", "bar"}
 	request.EnvName = "foo"
-	request.Config["account_prefix"] = "-"
+	request.Config["account_prefix"] = "root"
 	response := common.CreatePrepareTerraformResponse()
 	terraformImage := "test-terraform-image"
 

@@ -138,7 +138,7 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 	if !ok || accountPrefix == "" {
 		return fmt.Errorf("cdflow.yaml: error - config.params.account_prefix must be set and be a string value")
 	}
-	if accountPrefix == "-" {
+	if accountPrefix == "root" {
 		return h.addRootAccountCredentials(request.Env, responseEnv)
 	}
 
