@@ -134,8 +134,8 @@ func contains(val string, slice []string) bool {
 
 // AddDeployAccountCredentialsValue assumes a role in the right account and returns credentials.
 func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraformRequest, team string, responseEnv map[string]string) error {
-	assumeDeployRole, ok := request.Config["assume_deploy_role"].(bool)
-	if ok && !assumeDeployRole {
+	assumeRoleToDeploy, ok := request.Config["assume_role_to_deploy"].(bool)
+	if ok && !assumeRoleToDeploy {
 		return h.addRootAccountCredentials(request.Env, responseEnv)
 	}
 
