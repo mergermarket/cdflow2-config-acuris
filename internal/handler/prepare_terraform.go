@@ -153,7 +153,7 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 			prodEnvs[i+1] = v.(string)
 		}
 
-		fmt.Fprintf(h.ErrorStream, "Found additional_prod_envs, appending them to the default resulting in: %v\n", prodEnvs)
+		fmt.Fprintf(h.ErrorStream, "Found  additional_prod_envs, appending them to the default resulting in: %v\n", prodEnvs)
 	}
 
 	var accountName string
