@@ -22,7 +22,15 @@ terraform:
 
 ### Parameters
 
+#### `assume_role_to_deploy`
+
+Set this to `false` to deploy to the account that the calling shell is logged into. Stops the deployment switching
+roles to the dev/prod account pair
+The `account_prefix` is not required and will be ignored if this is set to `false`
+
 #### `account_prefix`
+
+Not required is `assume_role_to_deploy` is set to false
 
 Each team in Acuris deploys to a pair of AWS accounts. The "live" environment is deployed
 in an account ending in "prod", and all pre-live environments are deployed in an account
