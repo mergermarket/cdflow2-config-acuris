@@ -141,7 +141,7 @@ func (h *Handler) AddDeployAccountCredentialsValue(request *common.PrepareTerraf
 
 	accountPrefix, ok := request.Config["account_prefix"].(string)
 	if !ok || accountPrefix == "" {
-		return fmt.Errorf("cdflow.yaml: error - config.params.account_prefix must be set and be a string value")
+		return fmt.Errorf("cdflow.yaml:  error - config.params.account_prefix must be set and be a string value")
 	}
 
 	prodEnvs := []string{"live"}
