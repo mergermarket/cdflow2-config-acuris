@@ -1,11 +1,13 @@
 package handler_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -435,5 +437,199 @@ func TestPrepareTerraformWithAdditionalProdEnvs(t *testing.T) {
 	}
 	if response.Env["AWS_DEFAULT_REGION"] != handler.Region {
 		t.Fatalf("Want %q, got %q", handler.Region, response.Env["AWS_DEFAULT_REGION"])
+	}
+}
+
+func TestPrepareTerraformStateShouldExistButDoesNot(t *testing.T) {
+	// Given
+	request := common.CreatePrepareTerraformRequest()
+	request.Env["AWS_ACCESS_KEY_ID"] = "root_foo"
+	request.Env["AWS_SECRET_ACCESS_KEY"] = "root_bar"
+	request.Env["ROLE_SESSION_NAME"] = "baz"
+	team := "test-team"
+	request.Config["team"] = team
+	component := "test-component"
+	request.Component = component
+	request.EnvName = "live"
+	request.Config["account_prefix"] = "foo"
+	StateShouldExist := true
+	request.StateShouldExist = &StateShouldExist
+	response := common.CreatePrepareTerraformResponse()
+	terraformImage := "test-terraform-image"
+
+	accessKeyID := "foo"
+	secretAccessKey := "bar"
+	sessionToken := "baz"
+
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove(file.Name())
+
+	key := "bucketFoo/bar.txt" // Example key - correct path format, but not where tfstate would be located
+
+	mockS3Client := &MockS3Client{
+		getObjectBody: file,
+		files: map[string][]byte{
+			key: []byte("...file contents..."),
+		},
+	}
+
+	mockAssumeRoleProviderFactory := func(session client.ConfigProvider, roleARN, roleSessionName string) credentials.Provider {
+		return createMockAssumeRoleProvider(accessKeyID, secretAccessKey, sessionToken)
+	}
+
+	deployAccessKeyID := "do"
+	deploySecretAccessKey := "re"
+	deploySessionToken := "mi"
+	mockSTSClient := &MockSTSClient{
+		accessKeyID:     deployAccessKeyID,
+		secretAccessKey: deploySecretAccessKey,
+		sessionToken:    deploySessionToken,
+	}
+
+	deployAccountID := "1234567890"
+	mockOrganizationsClient := &MockOrganizationsClient{
+		Accounts: map[string]string{
+			"foodev":  "0987654321",
+			"fooprod": deployAccountID,
+			"bardev":  "00000000000",
+			"barprod": "11111111111",
+			"other":   "22222222222",
+		},
+	}
+
+	releaseDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(releaseDir)
+
+	loader := MockReleaseLoader{terraformImage: terraformImage}
+
+	var errorBuffer bytes.Buffer
+
+	h := handler.New().
+		WithErrorStream(&errorBuffer).
+		WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
+		WithS3ClientFactory(func(client.ConfigProvider) s3iface.S3API {
+			return mockS3Client
+		}).
+		WithSTSClientFactory(func(client.ConfigProvider) stsiface.STSAPI {
+			return mockSTSClient
+		}).
+		WithOrganizationsClientFactory(func(client.ConfigProvider) organizationsiface.OrganizationsAPI {
+			return mockOrganizationsClient
+		}).
+		WithReleaseLoader(&loader)
+
+	// When
+	if err := h.PrepareTerraform(request, response, releaseDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// Then
+	// t.Log(h.ErrorStream) // debug - view error error stream
+	if response.Success {
+		t.Fatal("unexpected success: Should fail when tfstate file does not exist")
+	}
+	if !strings.Contains(errorBuffer.String(), fmt.Sprintf("No existing state found for team: '%s', component: '%s', in env: '%s", team, component, request.EnvName)) {
+		t.Fatalf("wrong error?: %q", errorBuffer.String())
+	}
+}
+
+func TestPrepareTerraformStateShouldExist(t *testing.T) {
+	// Given
+	request := common.CreatePrepareTerraformRequest()
+	request.Env["AWS_ACCESS_KEY_ID"] = "root_foo"
+	request.Env["AWS_SECRET_ACCESS_KEY"] = "root_bar"
+	request.Env["ROLE_SESSION_NAME"] = "baz"
+	team := "test-team"
+	request.Config["team"] = team
+	component := "test-component"
+	request.Component = component
+	request.EnvName = "live"
+	request.Config["account_prefix"] = "foo"
+	StateShouldExist := true
+	request.StateShouldExist = &StateShouldExist
+	response := common.CreatePrepareTerraformResponse()
+	terraformImage := "test-terraform-image"
+
+	accessKeyID := "foo"
+	secretAccessKey := "bar"
+	sessionToken := "baz"
+
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove(file.Name())
+
+	key := fmt.Sprintf("acuris-tfstate/%s/%s/%s/terraform.tfstate", team, component, request.EnvName) // This IS where tfstate should be located
+
+	mockS3Client := &MockS3Client{
+		getObjectBody: file,
+		files: map[string][]byte{
+			key: []byte("...file contents..."),
+		},
+	}
+
+	mockAssumeRoleProviderFactory := func(session client.ConfigProvider, roleARN, roleSessionName string) credentials.Provider {
+		return createMockAssumeRoleProvider(accessKeyID, secretAccessKey, sessionToken)
+	}
+
+	deployAccessKeyID := "do"
+	deploySecretAccessKey := "re"
+	deploySessionToken := "mi"
+	mockSTSClient := &MockSTSClient{
+		accessKeyID:     deployAccessKeyID,
+		secretAccessKey: deploySecretAccessKey,
+		sessionToken:    deploySessionToken,
+	}
+
+	deployAccountID := "1234567890"
+	mockOrganizationsClient := &MockOrganizationsClient{
+		Accounts: map[string]string{
+			"foodev":  "0987654321",
+			"fooprod": deployAccountID,
+			"bardev":  "00000000000",
+			"barprod": "11111111111",
+			"other":   "22222222222",
+		},
+	}
+
+	releaseDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(releaseDir)
+
+	loader := MockReleaseLoader{terraformImage: terraformImage}
+
+	var errorBuffer bytes.Buffer
+
+	h := handler.New().
+		WithErrorStream(&errorBuffer).
+		WithAssumeRoleProviderFactory(mockAssumeRoleProviderFactory).
+		WithS3ClientFactory(func(client.ConfigProvider) s3iface.S3API {
+			return mockS3Client
+		}).
+		WithSTSClientFactory(func(client.ConfigProvider) stsiface.STSAPI {
+			return mockSTSClient
+		}).
+		WithOrganizationsClientFactory(func(client.ConfigProvider) organizationsiface.OrganizationsAPI {
+			return mockOrganizationsClient
+		}).
+		WithReleaseLoader(&loader)
+
+	// When
+	if err := h.PrepareTerraform(request, response, releaseDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// Then
+	if !response.Success {
+		t.Fatal("unexpected failure: Should succeed when tfstate exists")
 	}
 }

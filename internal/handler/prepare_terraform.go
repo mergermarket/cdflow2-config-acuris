@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/organizations"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/sts"
 	common "github.com/mergermarket/cdflow2-config-common"
 )
@@ -41,6 +42,7 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 	response.TerraformBackendConfig["token"] = releaseAccountCredentialsValue.SessionToken
 	response.TerraformBackendConfig["region"] = Region
 	response.TerraformBackendConfig["bucket"] = TFStateBucket
+	// When using a non-default workspace, the state path will be bucket/workspace_key_prefix/workspace_name/key
 	response.TerraformBackendConfig["workspace_key_prefix"] = fmt.Sprintf("%s/%s", team, request.Component)
 	response.TerraformBackendConfig["key"] = "terraform.tfstate"
 	response.TerraformBackendConfig["dynamodb_table"] = fmt.Sprintf("%s-tflocks", team)
@@ -58,11 +60,25 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 
 	AddAdditionalEnvironment(request.Env, response.Env)
 
+	s3Client := h.S3ClientFactory(session)
+
+	if request.StateShouldExist != nil {
+		statePath := fmt.Sprintf("%s/%s/%s", response.TerraformBackendConfig["workspace_key_prefix"], request.EnvName, response.TerraformBackendConfig["key"])
+		if *request.StateShouldExist {
+			if err := h.validateState(request, team, statePath, response, s3Client); err != nil {
+				response.Success = false
+				fmt.Fprintln(h.ErrorStream, err)
+				return nil
+			}
+		}
+		// if !*request.StateShouldExist {
+
+		// }
+	}
+
 	if request.Version == "" {
 		return nil
 	}
-
-	s3Client := h.S3ClientFactory(session)
 
 	key := releaseS3Key(team, request.Component, request.Version)
 	fmt.Fprintf(h.ErrorStream, "- Downloading release from s3://%s/%s...\n", ReleaseBucket, key)
@@ -106,6 +122,36 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 		return err
 	}
 	response.TerraformImage = terraformImage
+
+	return nil
+}
+
+// Conduct tfstate validation. Return error if fail, otherwise return nil
+func (h *Handler) validateState(request *common.PrepareTerraformRequest, team string, statePath string, response *common.PrepareTerraformResponse, s3Client s3iface.S3API) error {
+	stateBucket := response.TerraformBackendConfig["bucket"]
+	key := statePath
+	fmt.Fprintf(h.ErrorStream, "- Checking tfstate exists at s3://%s/%s\n", stateBucket, key)
+
+	_, err := s3Client.HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(stateBucket),
+		Key:    aws.String(key),
+	})
+
+	if err != nil {
+		// prints the aws s3 error received
+		fmt.Fprintln(h.ErrorStream, err)
+		// returns a user friendly error
+		err = fmt.Errorf("- No existing state found for team: '%v', component: '%v', in env: '%v'", team, request.Component, request.EnvName)
+		return err
+	}
+
+	// TODO: is headObjectOutput useful/needed?
+	// fmt.Println(headObjectOutput) //do something with metadata
+	// fmt.Fprintln(h.ErrorStream, headObjectOutput)
+
+	// TODO: Could message be more helpful regarding how to resolve it?
+	// "If a deliberate change has been made to the team or component name, please complete the appropriate tfstate migration"
+	// "If creating a new service use the {} flag for the initial deployment"
 
 	return nil
 }
