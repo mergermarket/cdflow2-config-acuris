@@ -15,4 +15,6 @@ COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 VOLUME /tmp
 ENV TMPDIR /tmp
 
+LABEL type="platform"
+
 ENTRYPOINT ["/app"]
