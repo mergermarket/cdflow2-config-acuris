@@ -266,4 +266,6 @@ func AddAdditionalEnvironment(requestEnv map[string]string, responseEnv map[stri
 	responseEnv["DD_API_KEY"] = requestEnv["DATADOG_API_KEY"]
 	responseEnv["FASTLY_API_KEY"] = requestEnv["FASTLY_API_KEY"]
 	responseEnv["GITHUB_TOKEN"] = requestEnv["GITHUB_TOKEN"]
+	responseEnv["MONGODB_ATLAS_PUBLIC_KEY"] = requestEnv["MONGODB_ATLAS_PUBLIC_KEY"]
+	responseEnv["MONGODB_ATLAS_PRIVATE_KEY"] = requestEnv["MONGODB_ATLAS_PRIVATE_KEY"]
 }
