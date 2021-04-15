@@ -138,20 +138,14 @@ func (h *Handler) validateState(request *common.PrepareTerraformRequest, team st
 	})
 
 	if err != nil {
-		// prints the aws s3 error received
-		fmt.Fprintln(h.ErrorStream, err)
-		// returns a user friendly error
-		err = fmt.Errorf("- No existing state found for team: '%v', component: '%v', in env: '%v'", team, request.Component, request.EnvName)
+		message := "state file not found\n\n" +
+			"If creating a new service, or new environment for an existing service, use the --new-state flag.\n\n" +
+			"Otherwise, this can happen if the team or component name have been changed. In this case the tfstate\n" +
+			"needs to be moved in order to keep track of your resources. Contact Platform for assistance.\n"
+
+		err = fmt.Errorf(message)
 		return err
 	}
-
-	// TODO: is headObjectOutput useful/needed?
-	// fmt.Println(headObjectOutput) //do something with metadata
-	// fmt.Fprintln(h.ErrorStream, headObjectOutput)
-
-	// TODO: Could message be more helpful regarding how to resolve it?
-	// "If a deliberate change has been made to the team or component name, please complete the appropriate tfstate migration"
-	// "If creating a new service use the {} flag for the initial deployment"
 
 	return nil
 }
