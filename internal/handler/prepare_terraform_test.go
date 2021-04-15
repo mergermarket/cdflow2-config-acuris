@@ -534,7 +534,7 @@ func TestPrepareTerraformStateShouldExistButDoesNot(t *testing.T) {
 	if response.Success {
 		t.Fatal("unexpected success: Should fail when tfstate file does not exist")
 	}
-	if !strings.Contains(errorBuffer.String(), fmt.Sprintf("No existing state found for team: '%s', component: '%s', in env: '%s", team, component, request.EnvName)) {
+	if !strings.Contains(errorBuffer.String(), "state file not found") {
 		t.Fatalf("wrong error?: %q", errorBuffer.String())
 	}
 }
