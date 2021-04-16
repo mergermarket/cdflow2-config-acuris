@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/organizations"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
@@ -65,15 +66,19 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 	if request.StateShouldExist != nil {
 		statePath := fmt.Sprintf("%s/%s/%s", response.TerraformBackendConfig["workspace_key_prefix"], request.EnvName, response.TerraformBackendConfig["key"])
 		if *request.StateShouldExist {
-			if err := h.validateState(request, team, statePath, response, s3Client); err != nil {
+			if err := h.validateStateExists(request, team, statePath, response, s3Client); err != nil {
 				response.Success = false
 				fmt.Fprintln(h.ErrorStream, err)
 				return nil
 			}
 		}
-		// if !*request.StateShouldExist {
-
-		// }
+		if !*request.StateShouldExist {
+			if err := h.validateStateDoesNotExist(request, team, statePath, response, s3Client); err != nil {
+				response.Success = false
+				fmt.Fprintln(h.ErrorStream, err)
+				return nil
+			}
+		}
 	}
 
 	if request.Version == "" {
@@ -126,8 +131,7 @@ func (h *Handler) PrepareTerraform(request *common.PrepareTerraformRequest, resp
 	return nil
 }
 
-// Conduct tfstate validation. Return error if fail, otherwise return nil
-func (h *Handler) validateState(request *common.PrepareTerraformRequest, team string, statePath string, response *common.PrepareTerraformResponse, s3Client s3iface.S3API) error {
+func (h *Handler) validateStateExists(request *common.PrepareTerraformRequest, team string, statePath string, response *common.PrepareTerraformResponse, s3Client s3iface.S3API) error {
 	stateBucket := response.TerraformBackendConfig["bucket"]
 	key := statePath
 	fmt.Fprintf(h.ErrorStream, "- Checking tfstate exists at s3://%s/%s\n", stateBucket, key)
@@ -138,16 +142,39 @@ func (h *Handler) validateState(request *common.PrepareTerraformRequest, team st
 	})
 
 	if err != nil {
-		message := "state file not found\n\n" +
-			"If creating a new service, or new environment for an existing service, use the --new-state flag.\n\n" +
-			"Otherwise, this can happen if the team or component name have been changed. In this case the tfstate\n" +
-			"needs to be moved in order to keep track of your resources. Contact Platform for assistance.\n"
-
-		err = fmt.Errorf(message)
-		return err
+		return fmt.Errorf(
+			"state file not found\n\n" +
+				"If creating a new service, or new environment for an existing service, use the --new-state flag.\n\n" +
+				"Otherwise, this can happen if the team or component name have been changed. In this case the tfstate\n" +
+				"needs to be moved in order to keep track of your resources. Contact Platform for assistance.\n",
+		)
 	}
 
 	return nil
+}
+
+func (h *Handler) validateStateDoesNotExist(request *common.PrepareTerraformRequest, team string, statePath string, response *common.PrepareTerraformResponse, s3Client s3iface.S3API) error {
+	stateBucket := response.TerraformBackendConfig["bucket"]
+	key := statePath
+	fmt.Fprintf(h.ErrorStream, "- Checking tfstate does not already exist at s3://%s/%s\n", stateBucket, key)
+
+	_, err := s3Client.HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(stateBucket),
+		Key:    aws.String(key),
+	})
+
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "NotFound" {
+			// s3.ErrCodeNoSuchKey does not work, aws is missing this error code so we hardwire a string
+			return nil
+		}
+		return err
+	}
+
+	return fmt.Errorf(
+		"state file found" +
+			"\n\nRemove the --new-state or -n option if this service has previously been deployed.\n",
+	)
 }
 
 func (h *Handler) addRootAccountCredentials(requestEnv map[string]string, responseEnv map[string]string) error {
