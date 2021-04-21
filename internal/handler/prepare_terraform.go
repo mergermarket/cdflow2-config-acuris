@@ -289,4 +289,5 @@ func AddAdditionalEnvironment(requestEnv map[string]string, responseEnv map[stri
 	responseEnv["GITHUB_TOKEN"] = requestEnv["GITHUB_TOKEN"]
 	responseEnv["MONGODB_ATLAS_PUBLIC_KEY"] = requestEnv["MONGODB_ATLAS_PUBLIC_KEY"]
 	responseEnv["MONGODB_ATLAS_PRIVATE_KEY"] = requestEnv["MONGODB_ATLAS_PRIVATE_KEY"]
+	responseEnv["JUNOS_PASSWORD"] = requestEnv["JUNOS_PASSWORD"]
 }
