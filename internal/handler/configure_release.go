@@ -69,6 +69,7 @@ func (h *Handler) ConfigureRelease(request *common.ConfigureReleaseRequest, resp
 	var ecrBuilds []string
 	for buildID, reqs := range request.ReleaseRequirements {
 		response.Env[buildID] = make(map[string]string)
+		response.Env[buildID]["GITHUB_TOKEN"] = request.Env["GITHUB_TOKEN"]
 
 		for _, need := range reqs.Needs {
 			if need == "lambda" {

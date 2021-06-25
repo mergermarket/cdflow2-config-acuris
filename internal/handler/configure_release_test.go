@@ -169,6 +169,7 @@ func createConfigureReleaseRequest() *common.ConfigureReleaseRequest {
 	request.Env["AWS_ACCESS_KEY_ID"] = "foo"
 	request.Env["AWS_SECRET_ACCESS_KEY"] = "bar"
 	request.Env["ROLE_SESSION_NAME"] = "baz"
+	request.Env["GITHUB_TOKEN"] = "test-github-token"
 	return request
 }
 
@@ -227,6 +228,13 @@ func TestConfigureRelease(t *testing.T) {
 		if response.AdditionalMetadata["team"] != team {
 			t.Fatalf("expected %q, got %q", team, response.AdditionalMetadata["team"])
 		}
+		if response.Env["my-x"]["GITHUB_TOKEN"] != "test-github-token" {
+			t.Fatalf("expected %q, got %q", "test-github-token", response.Env["my-lambda"]["GITHUB_TOKEN"])
+		}
+		if response.Env["my-lambda"]["GITHUB_TOKEN"] != "test-github-token" {
+			t.Fatalf("expected %q, got %q", "test-github-token", response.Env["my-lambda"]["GITHUB_TOKEN"])
+		}
+
 	})
 	t.Run("ECR build", func(t *testing.T) {
 		// Given
